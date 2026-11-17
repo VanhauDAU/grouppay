@@ -291,6 +291,7 @@ export function App() {
                 setIsSelectMemberOpen(true);
               }
             }}
+            onNavigateToActivities={() => setActiveTab('ACTIVITIES')}
           />
         )}
 

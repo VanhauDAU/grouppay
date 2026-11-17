@@ -8,7 +8,9 @@ import {
   XCircle,
   TrendingDown,
   Sparkles,
-  AlertCircle
+  AlertCircle,
+  Receipt,
+  ArrowRight
 } from 'lucide-react';
 import { formatVND, getInitials, getAvatarColor } from '../../utils/format.js';
 import confetti from 'canvas-confetti';
@@ -22,6 +24,7 @@ interface DashboardViewProps {
   onRejectPayment: (paymentId: string) => void;
   onOpenSelectMember: () => void;
   onOpenBankConfig: () => void;
+  onNavigateToActivities?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -31,9 +34,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onConfirmPayment,
   onRejectPayment,
   onOpenSelectMember,
-  onOpenBankConfig
+  onOpenBankConfig,
+  onNavigateToActivities
 }) => {
-  const { personal, group, netBalances, settlementProposals } = data || {};
+  const { personal, group, netBalances, settlementProposals, recentActivities } = data || {};
 
   const handleConfirmWithConfetti = (paymentId: string) => {
     confetti({
@@ -244,7 +248,91 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       )}
 
-      {/* 4. Đề xuất tối ưu chuyển khoản (Settlement Proposals) */}
+      {/* 4. Danh sách người đang nợ bạn */}
+      {personal?.peopleOweMe && personal.peopleOweMe.length > 0 && (
+        <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              Những người đang nợ bạn ({personal.peopleOweMe.length})
+            </h4>
+            <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
+              Chờ nhận: {formatVND(personal.totalOwedByOthers)}
+            </span>
+          </div>
+          <div className="space-y-2">
+            {personal.peopleOweMe.map((item: any) => (
+              <div
+                key={item.debtorId}
+                className="p-3.5 rounded-2xl bg-slate-50/80 border border-slate-100 flex items-center justify-between"
+              >
+                <div className="flex items-center space-x-3">
+                  <div
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs ${getAvatarColor(
+                      item.debtorName
+                    )}`}
+                  >
+                    {getInitials(item.debtorName)}
+                  </div>
+                  <div>
+                    <div className="font-bold text-slate-800 text-sm">{item.debtorName}</div>
+                    <div className="text-xs text-slate-400">cần chuyển lại cho bạn</div>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <div className="text-sm font-extrabold text-emerald-600">+{formatVND(item.amount)}</div>
+                  <span className="text-[10px] text-slate-400">chưa thanh toán</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 5. Hoạt động chi tiêu gần đây */}
+      {recentActivities && recentActivities.length > 0 && (
+        <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm space-y-3">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center space-x-2">
+              <Receipt className="w-4 h-4 text-emerald-600" />
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Hoạt động chi tiêu gần đây
+              </h4>
+            </div>
+            {onNavigateToActivities && (
+              <button
+                onClick={onNavigateToActivities}
+                className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center space-x-1 hover:underline"
+              >
+                <span>Xem tất cả</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="divide-y divide-slate-100">
+            {recentActivities.map((act: any) => (
+              <div key={act.id} className="py-2.5 flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-bold text-slate-800">{act.title}</div>
+                  <div className="text-[11px] text-slate-400">
+                    {new Date(act.occurred_at).toLocaleDateString('vi-VN', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                </div>
+                <div className="text-sm font-extrabold text-slate-900">{formatVND(act.total_amount)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 6. Đề xuất tối ưu chuyển khoản (Settlement Proposals) */}
       {settlementProposals && settlementProposals.length > 0 && (
         <div className="bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-50/40 p-5 rounded-3xl border border-emerald-200 shadow-sm space-y-3">
           <div className="flex items-center justify-between">
@@ -279,7 +367,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       )}
 
-      {/* 5. Tổng quan toàn nhóm (Group Overview) */}
+      {/* 7. Tổng quan toàn nhóm (Group Overview) */}
       <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div>
