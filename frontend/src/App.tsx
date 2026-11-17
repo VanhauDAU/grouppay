@@ -105,13 +105,8 @@ export function App() {
       if (gRes.success && gRes.data) setGroupInfo(gRes.data);
       if (mRes.success && mRes.data) {
         setMembers(mRes.data);
-        if (currentMember) {
-          const fresh = mRes.data.find((m: any) => m.id === currentMember.id);
-          if (fresh && (fresh.avatarUrl !== currentMember.avatarUrl || fresh.name !== currentMember.name)) {
-            setCurrentMember(fresh);
-            localStorage.setItem('tinhtien_current_member', JSON.stringify(fresh));
-          }
-        } else {
+        // Nếu chưa chọn member hoặc member không thuộc nhóm nữa, mở modal chọn
+        if (!currentMember || !mRes.data.some((m: any) => m.id === currentMember.id)) {
           setIsSelectMemberOpen(true);
         }
       }
@@ -259,9 +254,8 @@ export function App() {
                 </h2>
                 {/* Live connection status dot */}
                 <span
-                  className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                    isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'
-                  }`}
+                  className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'
+                    }`}
                   title={isConnected ? 'Đang kết nối Realtime' : 'Mất kết nối'}
                 />
               </div>
@@ -415,9 +409,8 @@ export function App() {
           <button
             onClick={() => setActiveTab('DASHBOARD')}
             style={activeTab === 'DASHBOARD' ? { color: currentTheme.hex } : undefined}
-            className={`flex flex-col items-center py-1 px-2.5 rounded-2xl transition ${
-              activeTab === 'DASHBOARD' ? 'font-bold' : 'text-slate-400 font-medium hover:text-slate-600'
-            }`}
+            className={`flex flex-col items-center py-1 px-2.5 rounded-2xl transition ${activeTab === 'DASHBOARD' ? 'font-bold' : 'text-slate-400 font-medium hover:text-slate-600'
+              }`}
           >
             <LayoutDashboard className="w-5 h-5 mb-0.5" />
             <span className="text-[10px]">Tổng quan</span>
@@ -426,9 +419,8 @@ export function App() {
           <button
             onClick={() => setActiveTab('ACTIVITIES')}
             style={activeTab === 'ACTIVITIES' ? { color: currentTheme.hex } : undefined}
-            className={`flex flex-col items-center py-1 px-2.5 rounded-2xl transition ${
-              activeTab === 'ACTIVITIES' ? 'font-bold' : 'text-slate-400 font-medium hover:text-slate-600'
-            }`}
+            className={`flex flex-col items-center py-1 px-2.5 rounded-2xl transition ${activeTab === 'ACTIVITIES' ? 'font-bold' : 'text-slate-400 font-medium hover:text-slate-600'
+              }`}
           >
             <Receipt className="w-5 h-5 mb-0.5" />
             <span className="text-[10px]">Khoản chi</span>
@@ -447,9 +439,8 @@ export function App() {
           <button
             onClick={() => setActiveTab('DEBTS')}
             style={activeTab === 'DEBTS' ? { color: currentTheme.hex } : undefined}
-            className={`flex flex-col items-center py-1 px-2.5 rounded-2xl transition ${
-              activeTab === 'DEBTS' ? 'font-bold' : 'text-slate-400 font-medium hover:text-slate-600'
-            }`}
+            className={`flex flex-col items-center py-1 px-2.5 rounded-2xl transition ${activeTab === 'DEBTS' ? 'font-bold' : 'text-slate-400 font-medium hover:text-slate-600'
+              }`}
           >
             <Scale className="w-5 h-5 mb-0.5" />
             <span className="text-[10px]">Công nợ</span>
@@ -458,9 +449,8 @@ export function App() {
           <button
             onClick={() => setActiveTab('PAYMENTS')}
             style={activeTab === 'PAYMENTS' ? { color: currentTheme.hex } : undefined}
-            className={`flex flex-col items-center py-1 px-2.5 rounded-2xl transition ${
-              activeTab === 'PAYMENTS' ? 'font-bold' : 'text-slate-400 font-medium hover:text-slate-600'
-            }`}
+            className={`flex flex-col items-center py-1 px-2.5 rounded-2xl transition ${activeTab === 'PAYMENTS' ? 'font-bold' : 'text-slate-400 font-medium hover:text-slate-600'
+              }`}
           >
             <CreditCard className="w-5 h-5 mb-0.5" />
             <span className="text-[10px]">Thanh toán</span>
@@ -469,9 +459,8 @@ export function App() {
           <button
             onClick={() => setActiveTab('MEMBERS')}
             style={activeTab === 'MEMBERS' ? { color: currentTheme.hex } : undefined}
-            className={`flex flex-col items-center py-1 px-2.5 rounded-2xl transition ${
-              activeTab === 'MEMBERS' ? 'font-bold' : 'text-slate-400 font-medium hover:text-slate-600'
-            }`}
+            className={`flex flex-col items-center py-1 px-2.5 rounded-2xl transition ${activeTab === 'MEMBERS' ? 'font-bold' : 'text-slate-400 font-medium hover:text-slate-600'
+              }`}
           >
             <Users className="w-5 h-5 mb-0.5" />
             <span className="text-[10px]">Thành viên</span>

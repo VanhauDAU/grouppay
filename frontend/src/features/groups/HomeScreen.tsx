@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Users, ArrowRight, ShieldCheck, Wallet, Sparkles, Trash2 } from 'lucide-react';
+import { Plus, Users, ArrowRight, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
 import { api } from '../../services/api.js';
 import { toast } from 'sonner';
 
