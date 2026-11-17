@@ -3,6 +3,7 @@ import { UserCheck, Plus, Check } from 'lucide-react';
 import { Modal } from '../../components/common/Modal.js';
 import { getInitials } from '../../utils/format.js';
 import { getMemberTheme } from '../../utils/theme.js';
+import { Avatar } from '../../components/common/Avatar.js';
 import { api } from '../../services/api.js';
 import { toast } from 'sonner';
 
@@ -83,12 +84,7 @@ export const SelectMemberModal: React.FC<SelectMemberModalProps> = ({
                   }`}
                 >
                   <div className="flex items-center space-x-3">
-                    <div
-                      className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs text-white"
-                      style={{ backgroundColor: theme.hex }}
-                    >
-                      {getInitials(m.name)}
-                    </div>
+                    <Avatar name={m.name} avatarUrl={m.avatarUrl} size="sm" />
                     <div>
                       <div className="font-bold text-slate-800 text-sm">{m.name}</div>
                       {isSelected && <span className="text-[11px] font-semibold text-slate-500">Đang chọn</span>}

@@ -11,10 +11,13 @@ import {
   Receipt,
   ArrowRight,
   Palette,
-  Check
+  Camera,
+  Layers,
+  ChevronRight
 } from 'lucide-react';
-import { formatVND, getInitials } from '../../utils/format.js';
-import { getMemberTheme, type ThemeColor } from '../../utils/theme.js';
+import { formatVND } from '../../utils/format.js';
+import { Avatar } from '../../components/common/Avatar.js';
+import { type ThemeColor } from '../../utils/theme.js';
 import confetti from 'canvas-confetti';
 
 interface DashboardViewProps {
@@ -26,7 +29,7 @@ interface DashboardViewProps {
   onRejectPayment: (paymentId: string) => void;
   onOpenSelectMember: () => void;
   onOpenBankConfig: () => void;
-  onOpenThemePicker: () => void;
+  onOpenProfileModal: () => void;
   onNavigateToActivities?: () => void;
   onNavigateToDebts?: () => void;
 }
@@ -40,7 +43,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onRejectPayment,
   onOpenSelectMember,
   onOpenBankConfig,
-  onOpenThemePicker,
+  onOpenProfileModal,
   onNavigateToActivities,
   onNavigateToDebts
 }) => {
@@ -48,42 +51,75 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const handleConfirmWithConfetti = (paymentId: string) => {
     confetti({
-      particleCount: 60,
-      spread: 50,
+      particleCount: 70,
+      spread: 60,
       origin: { y: 0.7 }
     });
     onConfirmPayment(paymentId);
   };
 
+  // Loading skeleton nếu chưa có dữ liệu
+  if (!data) {
+    return (
+      <div className="space-y-4 pb-20 animate-pulse">
+        <div className="bg-slate-200/70 h-52 rounded-3xl" />
+        <div className="bg-slate-200/70 h-32 rounded-3xl" />
+        <div className="bg-slate-200/70 h-40 rounded-3xl" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 pb-20">
-      {/* 1. Thẻ số dư cá nhân (Thiết kế phẳng, tinh tế, không chói mắt) */}
+      {/* 1. Thẻ số dư cá nhân Sinh Động, Hiệu Ứng Màu Sắc Tương Tác */}
       {personal ? (
-        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs p-5 relative overflow-hidden transition">
-          {/* Header cá nhân: Avatar, Tên, Nút đổi màu & Đổi vai trò */}
-          <div className="flex items-center justify-between pb-3.5 border-b border-slate-100">
+        <div
+          className="rounded-3xl border p-5 relative overflow-hidden transition-all duration-300 shadow-md hover:shadow-lg"
+          style={{
+            background: `linear-gradient(135deg, ${currentTheme.hex}18 0%, #ffffff 50%, ${currentTheme.hex}0c 100%)`,
+            borderColor: `${currentTheme.hex}40`
+          }}
+        >
+          {/* Vòng sáng trang trí dịu nhẹ */}
+          <div
+            className="absolute -right-12 -top-12 w-44 h-44 rounded-full blur-3xl pointer-events-none transition-all duration-500"
+            style={{ backgroundColor: `${currentTheme.hex}25` }}
+          />
+          <div
+            className="absolute -left-12 -bottom-12 w-40 h-40 rounded-full blur-3xl pointer-events-none transition-all duration-500"
+            style={{ backgroundColor: `${currentTheme.hex}15` }}
+          />
+
+          {/* Header cá nhân: Avatar, Tên, Nút đổi ảnh & màu */}
+          <div className="flex items-center justify-between pb-3.5 border-b border-slate-200/60 relative z-10">
             <div className="flex items-center space-x-3">
               <button
                 type="button"
-                onClick={onOpenThemePicker}
-                title="Bấm để đổi màu chủ đạo của bạn"
-                className="relative group focus:outline-none"
+                onClick={onOpenProfileModal}
+                title="Bấm để đổi ảnh đại diện & màu chủ đạo"
+                className="relative group focus:outline-none transition transform active:scale-95"
               >
+                <Avatar
+                  name={personal.memberName}
+                  avatarUrl={personal.avatarUrl}
+                  size="md"
+                  className="ring-2 ring-white shadow-xs group-hover:scale-105 transition"
+                />
                 <div
-                  className="w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs text-white shadow-xs transition group-hover:scale-105"
+                  className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border border-white flex items-center justify-center shadow-2xs text-white"
                   style={{ backgroundColor: currentTheme.hex }}
                 >
-                  {getInitials(personal.memberName)}
-                </div>
-                <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-white border border-slate-200 flex items-center justify-center shadow-2xs">
-                  <Palette className="w-2.5 h-2.5 text-slate-600" />
+                  <Camera className="w-2.5 h-2.5" />
                 </div>
               </button>
 
               <div>
                 <div className="flex items-center space-x-1.5">
-                  <span className="text-sm font-bold text-slate-800">{personal.memberName}</span>
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                  <span className="text-sm font-extrabold text-slate-900">{personal.memberName}</span>
+                  <span
+                    className="text-[10px] font-bold px-2 py-0.2 rounded-full text-white shadow-2xs"
+                    style={{ backgroundColor: currentTheme.hex }}
+                  >
                     Bạn
                   </span>
                 </div>
@@ -93,17 +129,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <div className="flex items-center space-x-1.5">
               <button
-                onClick={onOpenThemePicker}
-                className="text-xs font-semibold px-2.5 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 flex items-center space-x-1 transition"
-                title="Chọn màu chủ đạo"
+                onClick={onOpenProfileModal}
+                className="text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 flex items-center space-x-1 shadow-2xs transition active:scale-95"
+                title="Đổi màu sắc & ảnh đại diện"
               >
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: currentTheme.hex }} />
-                <span className="hidden sm:inline">Màu</span>
+                <Palette className="w-3.5 h-3.5" style={{ color: currentTheme.hex }} />
+                <span className="hidden sm:inline">Màu & Ảnh</span>
               </button>
 
               <button
                 onClick={onOpenSelectMember}
-                className="text-xs font-semibold px-2.5 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
+                className="text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 transition active:scale-95 shadow-2xs"
               >
                 Đổi vai trò
               </button>
@@ -111,62 +147,62 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           {/* Số dư ròng trung tâm */}
-          <div className="pt-4 pb-2">
+          <div className="pt-4 pb-2 relative z-10">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                 Số dư ròng của bạn
               </span>
               {personal.netBalance > 0 ? (
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200/80 shadow-2xs">
                   Được nhận lại
                 </span>
               ) : personal.netBalance < 0 ? (
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200/80">
+                <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200/80 shadow-2xs">
                   Cần thanh toán
                 </span>
               ) : (
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                  Đã cân bằng
+                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                  Đã cân bằng 0 đ
                 </span>
               )}
             </div>
 
-            <div className="text-3xl font-black mt-1.5 tracking-tight">
+            <div className="text-3xl sm:text-4xl font-black mt-1.5 tracking-tight">
               {personal.netBalance > 0 ? (
                 <span className="text-emerald-600">+{formatVND(personal.netBalance)}</span>
               ) : personal.netBalance < 0 ? (
-                <span className="text-rose-500">-{formatVND(Math.abs(personal.netBalance))}</span>
+                <span className="text-rose-600">-{formatVND(Math.abs(personal.netBalance))}</span>
               ) : (
-                <span className="text-slate-700">0 đ</span>
+                <span className="text-slate-800">0 đ</span>
               )}
             </div>
           </div>
 
-          {/* 2 chỉ số phụ gọn gàng */}
-          <div className="grid grid-cols-2 gap-2.5 mt-3 text-xs">
-            <div className="bg-slate-50/80 p-3 rounded-2xl border border-slate-100">
-              <div className="flex items-center space-x-1.5 text-slate-500 font-semibold mb-0.5">
-                <ArrowUpRight className="w-3.5 h-3.5 text-rose-500" />
+          {/* 2 chỉ số phụ cân bằng */}
+          <div className="grid grid-cols-2 gap-2.5 mt-3 text-xs relative z-10">
+            <div className="bg-white/90 backdrop-blur-xs p-3 rounded-2xl border border-slate-200/70 shadow-2xs">
+              <div className="flex items-center space-x-1.5 text-slate-500 font-bold mb-0.5">
+                <ArrowUpRight className="w-3.5 h-3.5 text-rose-500 stroke-[2.5]" />
                 <span>Bạn cần trả</span>
               </div>
-              <div className="text-sm font-bold text-slate-800">{formatVND(personal.totalOwedToOthers)}</div>
+              <div className="text-base font-black text-rose-600">{formatVND(personal.totalOwedToOthers)}</div>
             </div>
 
-            <div className="bg-slate-50/80 p-3 rounded-2xl border border-slate-100">
-              <div className="flex items-center space-x-1.5 text-slate-500 font-semibold mb-0.5">
-                <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-600" />
+            <div className="bg-white/90 backdrop-blur-xs p-3 rounded-2xl border border-slate-200/70 shadow-2xs">
+              <div className="flex items-center space-x-1.5 text-slate-500 font-bold mb-0.5">
+                <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
                 <span>Bạn được nhận</span>
               </div>
-              <div className="text-sm font-bold text-slate-800">{formatVND(personal.totalOwedByOthers)}</div>
+              <div className="text-base font-black text-emerald-600">{formatVND(personal.totalOwedByOthers)}</div>
             </div>
           </div>
 
           {/* Thao tác nhanh tinh gọn */}
-          <div className="grid grid-cols-2 gap-2.5 mt-4 pt-3.5 border-t border-slate-100">
+          <div className="grid grid-cols-2 gap-2.5 mt-4 pt-3.5 border-t border-slate-200/60 relative z-10">
             {personal.totalOwedToOthers > 0 ? (
               <button
                 onClick={() => onOpenPaymentModal()}
-                className="bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 px-3 rounded-2xl text-xs flex items-center justify-center space-x-1.5 shadow-xs transition active:scale-95"
+                className="bg-slate-900 hover:bg-slate-800 text-white font-extrabold py-3 px-3 rounded-2xl text-xs flex items-center justify-center space-x-1.5 shadow-sm transition active:scale-95"
               >
                 <QrCode className="w-4 h-4 text-emerald-400" />
                 <span>Trả nợ VietQR</span>
@@ -174,7 +210,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             ) : (
               <button
                 onClick={onOpenBankConfig}
-                className="bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold py-2.5 px-3 rounded-2xl text-xs flex items-center justify-center space-x-1.5 border border-slate-200/80 transition active:scale-95"
+                className="bg-white hover:bg-slate-50 text-slate-800 font-bold py-3 px-3 rounded-2xl text-xs flex items-center justify-center space-x-1.5 border border-slate-200 shadow-2xs transition active:scale-95"
               >
                 <QrCode className="w-4 h-4 text-slate-500" />
                 <span>Cài đặt VietQR</span>
@@ -183,29 +219,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <button
               onClick={onOpenCreateActivity}
-              className="text-white font-bold py-2.5 px-3 rounded-2xl text-xs flex items-center justify-center space-x-1.5 shadow-xs transition active:scale-95"
+              className="text-white font-extrabold py-3 px-3 rounded-2xl text-xs flex items-center justify-center space-x-1.5 shadow-md transition transform active:scale-95"
               style={{ backgroundColor: currentTheme.hex }}
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-4 h-4 stroke-[3]" />
               <span>Thêm khoản chi</span>
             </button>
           </div>
         </div>
       ) : (
         /* Chưa chọn vai trò */
-        <div className="bg-white border border-amber-200/90 p-4 rounded-3xl flex items-center justify-between shadow-2xs">
+        <div className="bg-white border border-amber-200/90 p-4 rounded-3xl flex items-center justify-between shadow-xs">
           <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-2xl bg-amber-50 flex items-center justify-center flex-shrink-0">
-              <AlertCircle className="w-5 h-5 text-amber-600" />
+            <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <AlertCircle className="w-5 h-5 text-amber-700" />
             </div>
             <div>
               <h4 className="text-xs font-bold text-slate-800">Bạn chưa chọn tên trong nhóm</h4>
-              <p className="text-[11px] text-slate-500">Chọn tên để xem công nợ cá nhân và tạo VietQR.</p>
+              <p className="text-[11px] text-slate-500">Chọn tên để xem công nợ cá nhân và tạo QR nhận tiền.</p>
             </div>
           </div>
           <button
             onClick={onOpenSelectMember}
-            className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3.5 py-2 rounded-xl whitespace-nowrap shadow-xs"
+            className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3.5 py-2 rounded-xl whitespace-nowrap shadow-xs active:scale-95"
           >
             Chọn tên
           </button>
@@ -214,7 +250,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* 2. Giao dịch cần bạn xác nhận */}
       {personal?.pendingReceived && personal.pendingReceived.length > 0 && (
-        <div className="bg-white border border-amber-200 p-4 rounded-3xl shadow-2xs space-y-2.5">
+        <div className="bg-white border border-amber-200 p-4 rounded-3xl shadow-xs space-y-2.5">
           <div className="flex items-center space-x-2 text-amber-800 font-bold text-xs uppercase tracking-wider">
             <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
             <span>Yêu cầu xác nhận nhận tiền ({personal.pendingReceived.length})</span>
@@ -267,46 +303,38 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            {personal.peopleIOwe.map((item: any) => {
-              const itemTheme = getMemberTheme({ name: item.creditorName });
-              return (
-                <div
-                  key={item.creditorId}
-                  className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center justify-between"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div
-                      className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs text-white"
-                      style={{ backgroundColor: itemTheme.hex }}
-                    >
-                      {getInitials(item.creditorName)}
-                    </div>
-                    <div>
-                      <div className="font-bold text-slate-800 text-xs">{item.creditorName}</div>
-                      <div className="text-xs font-extrabold text-rose-500">Cần trả: {formatVND(item.amount)}</div>
-                    </div>
+            {personal.peopleIOwe.map((item: any) => (
+              <div
+                key={item.creditorId}
+                className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center justify-between"
+              >
+                <div className="flex items-center space-x-3">
+                  <Avatar name={item.creditorName} size="sm" />
+                  <div>
+                    <div className="font-bold text-slate-800 text-xs">{item.creditorName}</div>
+                    <div className="text-xs font-extrabold text-rose-500">Cần trả: {formatVND(item.amount)}</div>
                   </div>
-
-                  <button
-                    onClick={() => onOpenPaymentModal(item.creditorId, item.amount)}
-                    className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center space-x-1 transition active:scale-95"
-                  >
-                    <QrCode className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Chuyển</span>
-                  </button>
                 </div>
-              );
-            })}
+
+                <button
+                  onClick={() => onOpenPaymentModal(item.creditorId, item.amount)}
+                  className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center space-x-1 transition active:scale-95"
+                >
+                  <QrCode className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Chuyển</span>
+                </button>
+              </div>
+            ))}
           </div>
 
           {onNavigateToDebts && (
             <button
               type="button"
               onClick={onNavigateToDebts}
-              className="w-full pt-1.5 text-center text-[11px] font-bold text-slate-500 hover:text-slate-800 flex items-center justify-center space-x-1"
+              className="w-full pt-1.5 text-center text-[11px] font-bold text-slate-500 hover:text-slate-800 flex items-center justify-center space-x-1 transition"
             >
               <Receipt className="w-3 h-3 text-slate-400" />
-              <span>Xem chi tiết cộng trừ các khoản nợ $\rightarrow$</span>
+              <span>Xem sổ đối chiếu cộng trừ chi tiết →</span>
             </button>
           )}
         </div>
@@ -325,55 +353,52 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            {personal.peopleOweMe.map((item: any) => {
-              const itemTheme = getMemberTheme({ name: item.debtorName });
-              return (
-                <div
-                  key={item.debtorId}
-                  className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center justify-between"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div
-                      className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs text-white"
-                      style={{ backgroundColor: itemTheme.hex }}
-                    >
-                      {getInitials(item.debtorName)}
-                    </div>
-                    <div>
-                      <div className="font-bold text-slate-800 text-xs">{item.debtorName}</div>
-                      <div className="text-[11px] text-slate-400">cần chuyển lại cho bạn</div>
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    <div className="text-xs font-extrabold text-emerald-600">+{formatVND(item.amount)}</div>
-                    <span className="text-[10px] text-slate-400">chưa trả</span>
+            {personal.peopleOweMe.map((item: any) => (
+              <div
+                key={item.debtorId}
+                className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center justify-between"
+              >
+                <div className="flex items-center space-x-3">
+                  <Avatar name={item.debtorName} size="sm" />
+                  <div>
+                    <div className="font-bold text-slate-800 text-xs">{item.debtorName}</div>
+                    <div className="text-[11px] text-slate-400">cần chuyển lại cho bạn</div>
                   </div>
                 </div>
-              );
-            })}
+
+                <div className="text-right">
+                  <div className="text-xs font-extrabold text-emerald-600">+{formatVND(item.amount)}</div>
+                  <span className="text-[10px] text-slate-400">chưa trả</span>
+                </div>
+              </div>
+            ))}
           </div>
 
           {onNavigateToDebts && (
             <button
               type="button"
               onClick={onNavigateToDebts}
-              className="w-full pt-1.5 text-center text-[11px] font-bold text-slate-500 hover:text-slate-800 flex items-center justify-center space-x-1"
+              className="w-full pt-1.5 text-center text-[11px] font-bold text-slate-500 hover:text-slate-800 flex items-center justify-center space-x-1 transition"
             >
               <Receipt className="w-3 h-3 text-slate-400" />
-              <span>Xem chi tiết cộng trừ các khoản nợ $\rightarrow$</span>
+              <span>Xem sổ đối chiếu cộng trừ chi tiết →</span>
             </button>
           )}
         </div>
       )}
 
-      {/* 5. Hoạt động chi tiêu gần đây (Gọn gàng, tinh tế) */}
+      {/* 5. Hoạt động chi tiêu gần đây */}
       {recentActivities && recentActivities.length > 0 && (
         <div className="bg-white p-4.5 rounded-3xl border border-slate-200/80 shadow-xs space-y-2.5">
           <div className="flex items-center justify-between pb-2 border-b border-slate-100">
             <div className="flex items-center space-x-2">
-              <Receipt className="w-4 h-4 text-slate-500" />
-              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              <div
+                className="w-6 h-6 rounded-lg flex items-center justify-center shadow-2xs"
+                style={{ backgroundColor: `${currentTheme.hex}20` }}
+              >
+                <Receipt className="w-3.5 h-3.5" style={{ color: currentTheme.hex }} />
+              </div>
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
                 Hoạt động gần đây
               </h4>
             </div>
@@ -408,15 +433,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       )}
 
-      {/* 6. Gợi ý chuyển tiền tối giản (Thiết kế nhẹ, tinh tế) */}
+      {/* 6. Gợi ý chuyển tiền tối giản */}
       {settlementProposals && settlementProposals.length > 0 && (
         <div className="bg-white p-4.5 rounded-3xl border border-slate-200/80 shadow-xs space-y-2.5">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-1.5 text-slate-700 font-bold text-xs uppercase tracking-wider">
+            <div className="flex items-center space-x-1.5 text-slate-800 font-bold text-xs uppercase tracking-wider">
               <Sparkles className="w-3.5 h-3.5 text-amber-500" />
               <span>Gợi ý chuyển tiền tối giản</span>
             </div>
-            <span className="text-[11px] bg-slate-100 text-slate-700 font-semibold px-2 py-0.5 rounded-full">
+            <span className="text-[11px] bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded-full">
               {settlementProposals.length} giao dịch
             </span>
           </div>
@@ -433,7 +458,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               >
                 <div className="flex items-center space-x-1.5">
                   <span className="font-bold text-slate-800">{prop.fromMemberName}</span>
-                  <span className="text-slate-400 text-[11px]">$\rightarrow$</span>
+                  <span className="text-slate-400 text-xs">→</span>
                   <span className="font-bold text-slate-800">{prop.toMemberName}</span>
                 </div>
                 <span className="font-extrabold text-slate-900">{formatVND(prop.amount)}</span>
@@ -461,32 +486,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
             Số dư ròng các thành viên
           </span>
-          {netBalances?.map((m: any) => {
-            const mTheme = getMemberTheme({ name: m.memberName });
-            return (
-              <div key={m.memberId} className="flex items-center justify-between text-xs py-1">
-                <div className="flex items-center space-x-2.5">
-                  <div
-                    className="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-[11px] text-white"
-                    style={{ backgroundColor: mTheme.hex }}
-                  >
-                    {getInitials(m.memberName)}
-                  </div>
-                  <span className="font-semibold text-slate-700">{m.memberName}</span>
-                </div>
-
-                <div className="font-extrabold text-xs">
-                  {m.netBalance > 0 ? (
-                    <span className="text-emerald-600">+{formatVND(m.netBalance)}</span>
-                  ) : m.netBalance < 0 ? (
-                    <span className="text-rose-500">-{formatVND(Math.abs(m.netBalance))}</span>
-                  ) : (
-                    <span className="text-slate-400">0 đ</span>
-                  )}
-                </div>
+          {netBalances?.map((m: any) => (
+            <div key={m.memberId} className="flex items-center justify-between text-xs py-1">
+              <div className="flex items-center space-x-2.5">
+                <Avatar name={m.memberName} size="xs" />
+                <span className="font-semibold text-slate-700">{m.memberName}</span>
               </div>
-            );
-          })}
+
+              <div className="font-extrabold text-xs">
+                {m.netBalance > 0 ? (
+                  <span className="text-emerald-600">+{formatVND(m.netBalance)}</span>
+                ) : m.netBalance < 0 ? (
+                  <span className="text-rose-500">-{formatVND(Math.abs(m.netBalance))}</span>
+                ) : (
+                  <span className="text-slate-400">0 đ</span>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

@@ -106,8 +106,8 @@ export const PairwiseDebtDetailModal: React.FC<PairwiseDebtDetailModalProps> = (
 
             <div className="flex flex-col items-center px-2">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Đối chiếu</span>
-              <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-500 shadow-2xs">
-                $\rightleftharpoons$
+              <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 shadow-2xs font-bold">
+                ⇄
               </div>
             </div>
 
@@ -178,7 +178,7 @@ export const PairwiseDebtDetailModal: React.FC<PairwiseDebtDetailModalProps> = (
                   • <b>{memberBName}</b> nợ <b>{memberAName}</b>: {formatVND(bOwesA)} (từ các khoản {memberAName} chi trả)
                 </div>
                 <div className="pt-1 border-t border-amber-200/60 font-bold text-amber-950">
-                  $\rightarrow$ Bù trừ: |{formatVND(aOwesB)} - {formatVND(bOwesA)}| = {formatVND(netAmount)} (
+                  → Bù trừ: |{formatVND(aOwesB)} - {formatVND(bOwesA)}| = {formatVND(netAmount)} (
                   {debtorName} trả {creditorName})
                 </div>
               </div>

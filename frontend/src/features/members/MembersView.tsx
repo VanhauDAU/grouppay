@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { getInitials } from '../../utils/format.js';
 import { getMemberTheme } from '../../utils/theme.js';
+import { Avatar } from '../../components/common/Avatar.js';
 import { Modal } from '../../components/common/Modal.js';
 import { api } from '../../services/api.js';
 import { toast } from 'sonner';
@@ -144,17 +145,20 @@ export const MembersView: React.FC<MembersViewProps> = ({
                   <button
                     type="button"
                     onClick={() => onOpenThemePicker && onOpenThemePicker(m)}
-                    title="Bấm để đổi màu chủ đạo của thành viên này"
-                    className="relative group focus:outline-none"
+                    title="Bấm để đổi ảnh đại diện & màu chủ đạo"
+                    className="relative group focus:outline-none transition active:scale-95"
                   >
+                    <Avatar
+                      name={m.name}
+                      avatarUrl={m.avatarUrl}
+                      size="md"
+                      className="group-hover:scale-105 transition shadow-2xs"
+                    />
                     <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs text-white shadow-2xs transition group-hover:scale-105"
+                      className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border border-white flex items-center justify-center shadow-2xs"
                       style={{ backgroundColor: theme.hex }}
                     >
-                      {getInitials(m.name)}
-                    </div>
-                    <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-white border border-slate-200 flex items-center justify-center shadow-2xs">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: theme.hex }} />
+                      <Palette className="w-2 h-2 text-white" />
                     </div>
                   </button>
 

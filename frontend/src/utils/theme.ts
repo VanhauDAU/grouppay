@@ -2,149 +2,115 @@ export interface ThemeColor {
   id: string;
   name: string;
   hex: string;
-  bgPrimary: string;
   bgLight: string;
-  textPrimary: string;
   borderLight: string;
-  badge: string;
-  btnPrimary: string;
-  ring: string;
-  avatar: string;
 }
 
-export const COLOR_THEMES: Record<string, ThemeColor> = {
-  emerald: {
-    id: 'emerald',
-    name: 'Xanh Ngọc',
-    hex: '#10b981',
-    bgPrimary: 'bg-emerald-600',
-    bgLight: 'bg-emerald-50',
-    textPrimary: 'text-emerald-600',
-    borderLight: 'border-emerald-200',
-    badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    btnPrimary: 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20',
-    ring: 'focus:ring-emerald-500',
-    avatar: 'bg-emerald-600 text-white'
-  },
-  indigo: {
-    id: 'indigo',
-    name: 'Xanh Chàm',
-    hex: '#6366f1',
-    bgPrimary: 'bg-indigo-600',
-    bgLight: 'bg-indigo-50',
-    textPrimary: 'text-indigo-600',
-    borderLight: 'border-indigo-200',
-    badge: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-    btnPrimary: 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/20',
-    ring: 'focus:ring-indigo-500',
-    avatar: 'bg-indigo-600 text-white'
-  },
-  violet: {
-    id: 'violet',
-    name: 'Tím Thạch Anh',
-    hex: '#8b5cf6',
-    bgPrimary: 'bg-violet-600',
-    bgLight: 'bg-violet-50',
-    textPrimary: 'text-violet-600',
-    borderLight: 'border-violet-200',
-    badge: 'bg-violet-50 text-violet-700 border-violet-200',
-    btnPrimary: 'bg-violet-600 hover:bg-violet-700 text-white shadow-violet-600/20',
-    ring: 'focus:ring-violet-500',
-    avatar: 'bg-violet-600 text-white'
-  },
-  blue: {
-    id: 'blue',
-    name: 'Xanh Biển',
-    hex: '#3b82f6',
-    bgPrimary: 'bg-blue-600',
-    bgLight: 'bg-blue-50',
-    textPrimary: 'text-blue-600',
-    borderLight: 'border-blue-200',
-    badge: 'bg-blue-50 text-blue-700 border-blue-200',
-    btnPrimary: 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/20',
-    ring: 'focus:ring-blue-500',
-    avatar: 'bg-blue-600 text-white'
-  },
-  rose: {
-    id: 'rose',
-    name: 'Đỏ Hồng',
-    hex: '#f43f5e',
-    bgPrimary: 'bg-rose-600',
-    bgLight: 'bg-rose-50',
-    textPrimary: 'text-rose-600',
-    borderLight: 'border-rose-200',
-    badge: 'bg-rose-50 text-rose-700 border-rose-200',
-    btnPrimary: 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/20',
-    ring: 'focus:ring-rose-500',
-    avatar: 'bg-rose-600 text-white'
-  },
-  amber: {
-    id: 'amber',
-    name: 'Cam Ấm',
-    hex: '#f59e0b',
-    bgPrimary: 'bg-amber-600',
-    bgLight: 'bg-amber-50',
-    textPrimary: 'text-amber-600',
-    borderLight: 'border-amber-200',
-    badge: 'bg-amber-50 text-amber-700 border-amber-200',
-    btnPrimary: 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/20',
-    ring: 'focus:ring-amber-500',
-    avatar: 'bg-amber-600 text-white'
-  },
-  teal: {
-    id: 'teal',
-    name: 'Xanh Mòng Két',
-    hex: '#14b8a6',
-    bgPrimary: 'bg-teal-600',
-    bgLight: 'bg-teal-50',
-    textPrimary: 'text-teal-600',
-    borderLight: 'border-teal-200',
-    badge: 'bg-teal-50 text-teal-700 border-teal-200',
-    btnPrimary: 'bg-teal-600 hover:bg-teal-700 text-white shadow-teal-600/20',
-    ring: 'focus:ring-teal-500',
-    avatar: 'bg-teal-600 text-white'
-  },
-  slate: {
-    id: 'slate',
-    name: 'Xám Tối Giản',
-    hex: '#475569',
-    bgPrimary: 'bg-slate-800',
-    bgLight: 'bg-slate-100',
-    textPrimary: 'text-slate-800',
-    borderLight: 'border-slate-300',
-    badge: 'bg-slate-100 text-slate-800 border-slate-300',
-    btnPrimary: 'bg-slate-800 hover:bg-slate-900 text-white shadow-slate-800/20',
-    ring: 'focus:ring-slate-500',
-    avatar: 'bg-slate-800 text-white'
-  }
-};
+export const PRESET_COLORS: { id: string; name: string; hex: string }[] = [
+  // Hàng Xanh lá / Ngọc
+  { id: 'emerald', name: 'Xanh Ngọc', hex: '#10b981' },
+  { id: 'teal', name: 'Xanh Mòng Két', hex: '#14b8a6' },
+  { id: 'mint', name: 'Bạc Hà', hex: '#059669' },
+  { id: 'lime', name: 'Xanh Chanh', hex: '#65a30d' },
+  
+  // Hàng Xanh dương / Biển
+  { id: 'cyan', name: 'Xanh Lam', hex: '#06b6d4' },
+  { id: 'sky', name: 'Xanh Da Trời', hex: '#0284c7' },
+  { id: 'blue', name: 'Xanh Đại Dương', hex: '#2563eb' },
+  { id: 'indigo', name: 'Xanh Chàm', hex: '#4f46e5' },
 
-export const DEFAULT_THEME_KEY = 'emerald';
+  // Hàng Tím / Hồng
+  { id: 'violet', name: 'Tím Thạch Anh', hex: '#7c3aed' },
+  { id: 'purple', name: 'Tím Đậm', hex: '#9333ea' },
+  { id: 'fuchsia', name: 'Hồng Fuchsia', hex: '#c026d3' },
+  { id: 'pink', name: 'Hồng Sen', hex: '#db2777' },
 
-export function getTheme(themeKey?: string | null): ThemeColor {
-  if (themeKey && COLOR_THEMES[themeKey]) {
-    return COLOR_THEMES[themeKey];
+  // Hàng Đỏ / Cam / Vàng
+  { id: 'rose', name: 'Đỏ Hồng', hex: '#e11d48' },
+  { id: 'red', name: 'Đỏ Ruby', hex: '#dc2626' },
+  { id: 'coral', name: 'Cam San Hô', hex: '#f43f5e' },
+  { id: 'orange', name: 'Cam Rực Rỡ', hex: '#ea580c' },
+  { id: 'amber', name: 'Hổ Phách', hex: '#d97706' },
+  { id: 'gold', name: 'Vàng Hoàng Kim', hex: '#ca8a04' },
+
+  // Hàng Đơn sắc / Tối giản
+  { id: 'slate', name: 'Xám Tối Giản', hex: '#475569' },
+  { id: 'midnight', name: 'Đen Than Chì', hex: '#0f172a' }
+];
+
+export const DEFAULT_HEX = '#10b981';
+
+// Chuyển hex sang rgb
+export function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  let clean = hex.replace('#', '');
+  if (clean.length === 3) {
+    clean = clean.split('').map((c) => c + c).join('');
   }
-  return COLOR_THEMES[DEFAULT_THEME_KEY];
+  const num = parseInt(clean, 16);
+  if (isNaN(num)) return { r: 16, g: 185, b: 129 };
+  return {
+    r: (num >> 16) & 255,
+    g: (num >> 8) & 255,
+    b: num & 255
+  };
 }
 
+// Tạo màu tương phản cho text trên nền màu (trắng hoặc đen)
+export function getContrastTextColor(hex: string): '#ffffff' | '#0f172a' {
+  const { r, g, b } = hexToRgb(hex);
+  // Luminance formula
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq >= 150 ? '#0f172a' : '#ffffff';
+}
+
+// Tạo ThemeColor từ mã Hex bất kỳ
+export function getThemeFromHex(hex?: string | null): ThemeColor {
+  const validHex = hex && /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(hex) ? hex : DEFAULT_HEX;
+  const found = PRESET_COLORS.find((p) => p.hex.toLowerCase() === validHex.toLowerCase());
+
+  return {
+    id: found ? found.id : 'custom',
+    name: found ? found.name : 'Tùy chỉnh',
+    hex: validHex,
+    bgLight: `${validHex}15`,
+    borderLight: `${validHex}35`
+  };
+}
+
+// Cập nhật biến CSS toàn cục lên document.documentElement
+export function applyThemeToDocument(hex: string) {
+  if (typeof document === 'undefined') return;
+  const { r, g, b } = hexToRgb(hex);
+  const root = document.documentElement;
+  root.style.setProperty('--primary', hex);
+  root.style.setProperty('--primary-rgb', `${r}, ${g}, ${b}`);
+  root.style.setProperty('--primary-light', `rgba(${r}, ${g}, ${b}, 0.1)`);
+  root.style.setProperty('--primary-border', `rgba(${r}, ${g}, ${b}, 0.25)`);
+}
+
+// Lấy theme cho thành viên từ avatarUrl hoặc tên
 export function getMemberTheme(member?: { avatarUrl?: string | null; name?: string } | null): ThemeColor {
-  if (!member) return COLOR_THEMES[DEFAULT_THEME_KEY];
+  if (!member) return getThemeFromHex(DEFAULT_HEX);
 
+  // Nếu avatarUrl có chứa định dạng "color:#..." hoặc "color:name"
   if (member.avatarUrl && member.avatarUrl.startsWith('color:')) {
-    const key = member.avatarUrl.replace('color:', '');
-    if (COLOR_THEMES[key]) return COLOR_THEMES[key];
+    const val = member.avatarUrl.replace('color:', '');
+    if (val.startsWith('#')) {
+      return getThemeFromHex(val);
+    }
+    const preset = PRESET_COLORS.find((p) => p.id === val);
+    if (preset) return getThemeFromHex(preset.hex);
   }
 
+  // Fallback hash ổn định theo tên
   if (member.name) {
-    const keys = Object.keys(COLOR_THEMES);
     let hash = 0;
     for (let i = 0; i < member.name.length; i++) {
       hash = member.name.charCodeAt(i) + ((hash << 5) - hash);
     }
-    const idx = Math.abs(hash) % keys.length;
-    return COLOR_THEMES[keys[idx]];
+    const idx = Math.abs(hash) % PRESET_COLORS.length;
+    return getThemeFromHex(PRESET_COLORS[idx].hex);
   }
 
-  return COLOR_THEMES[DEFAULT_THEME_KEY];
+  return getThemeFromHex(DEFAULT_HEX);
 }

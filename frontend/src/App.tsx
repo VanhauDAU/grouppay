@@ -33,8 +33,9 @@ import { NotificationsModal } from './features/notifications/NotificationsModal.
 import { PaymentModal } from './features/payments/PaymentModal.js';
 import { CreateActivityModal } from './features/activities/CreateActivityModal.js';
 import { BankConfigModal } from './features/members/BankConfigModal.js';
-import { ThemePickerModal } from './features/members/ThemePickerModal.js';
-import { getTheme, getMemberTheme, COLOR_THEMES, DEFAULT_THEME_KEY } from './utils/theme.js';
+import { EditProfileModal } from './features/members/EditProfileModal.js';
+import { getThemeFromHex, applyThemeToDocument, DEFAULT_HEX } from './utils/theme.js';
+import { Avatar } from './components/common/Avatar.js';
 import { getInitials, getAvatarColor } from './utils/format.js';
 
 type TabType = 'DASHBOARD' | 'ACTIVITIES' | 'DEBTS' | 'PAYMENTS' | 'MEMBERS' | 'HISTORY';
@@ -49,7 +50,7 @@ export function App() {
     return params.get('group');
   });
 
-  const [currentMember, setCurrentMember] = useState<{ id: string; name: string; status: string } | null>(() => {
+  const [currentMember, setCurrentMember] = useState<{ id: string; name: string; status: string; avatarUrl?: string | null } | null>(() => {
     try {
       const saved = localStorage.getItem('tinhtien_current_member');
       return saved ? JSON.parse(saved) : null;
@@ -80,10 +81,10 @@ export function App() {
   const [bankConfigMember, setBankConfigMember] = useState<any | null>(null);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
-  const [themeTargetMember, setThemeTargetMember] = useState<any | null>(null);
-  const [currentThemeId, setCurrentThemeId] = useState<string>(() => {
-    return localStorage.getItem('tinhtien_user_theme') || DEFAULT_THEME_KEY;
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [profileTargetMember, setProfileTargetMember] = useState<any | null>(null);
+  const [currentThemeHex, setCurrentThemeHex] = useState<string>(() => {
+    return localStorage.getItem('tinhtien_user_theme_hex') || DEFAULT_HEX;
   });
 
   // Load toàn bộ dữ liệu nhóm
@@ -129,22 +130,19 @@ export function App() {
   useEffect(() => {
     if (currentMember) {
       const mem = members.find((m: any) => m.id === currentMember.id) || currentMember;
-      if (mem.avatarUrl && mem.avatarUrl.startsWith('color:')) {
-        const themeKey = mem.avatarUrl.replace('color:', '');
-        if (COLOR_THEMES[themeKey]) {
-          setCurrentThemeId(themeKey);
-          localStorage.setItem('tinhtien_user_theme', themeKey);
-        }
+      if (mem.avatarUrl?.startsWith('color:#')) {
+        const hex = mem.avatarUrl.replace('color:', '');
+        setCurrentThemeHex(hex);
+        applyThemeToDocument(hex);
       }
     }
   }, [currentMember, members]);
 
-  const currentTheme = getTheme(currentThemeId);
+  useEffect(() => {
+    applyThemeToDocument(currentThemeHex);
+  }, [currentThemeHex]);
 
-  const handleSelectTheme = (themeId: string) => {
-    setCurrentThemeId(themeId);
-    localStorage.setItem('tinhtien_user_theme', themeId);
-  };
+  const currentTheme = getThemeFromHex(currentThemeHex);
 
   // Load history khi chuyển sang tab history
   useEffect(() => {
@@ -259,26 +257,21 @@ export function App() {
             {/* Member selector pill */}
             <button
               onClick={() => setIsSelectMemberOpen(true)}
-              className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 px-3 py-1.5 rounded-full text-xs font-bold transition"
+              className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 px-2.5 py-1.5 rounded-full text-xs font-bold transition"
             >
-              <div
-                className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] text-white font-bold"
-                style={{ backgroundColor: currentTheme.hex }}
-              >
-                {getInitials(currentMember?.name || '?')}
-              </div>
-              <span className="max-w-[70px] truncate">{currentMember?.name || 'Chọn tôi'}</span>
+              <Avatar name={currentMember?.name || '?'} avatarUrl={currentMember?.avatarUrl} size="xs" />
+              <span className="max-w-[75px] truncate">{currentMember?.name || 'Chọn tôi'}</span>
               <ChevronDown className="w-3 h-3 text-slate-500" />
             </button>
 
-            {/* Theme Color Picker Button */}
+            {/* Profile Avatar & Color Picker Button */}
             <button
               onClick={() => {
-                setThemeTargetMember(currentMember);
-                setIsThemePickerOpen(true);
+                setProfileTargetMember(currentMember);
+                setIsProfileModalOpen(true);
               }}
               className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition"
-              title="Đổi màu chủ đạo"
+              title="Đổi màu chủ đạo & Ảnh đại diện"
             >
               <Palette className="w-4.5 h-4.5" style={{ color: currentTheme.hex }} />
             </button>
@@ -332,9 +325,9 @@ export function App() {
                 setIsSelectMemberOpen(true);
               }
             }}
-            onOpenThemePicker={() => {
-              setThemeTargetMember(currentMember);
-              setIsThemePickerOpen(true);
+            onOpenProfileModal={() => {
+              setProfileTargetMember(currentMember);
+              setIsProfileModalOpen(true);
             }}
             onNavigateToActivities={() => setActiveTab('ACTIVITIES')}
             onNavigateToDebts={() => setActiveTab('DEBTS')}
@@ -382,8 +375,8 @@ export function App() {
             onCloseAddModal={() => setIsAddMemberOpen(!isAddMemberOpen)}
             onOpenBankConfig={(m) => setBankConfigMember(m)}
             onOpenThemePicker={(m) => {
-              setThemeTargetMember(m);
-              setIsThemePickerOpen(true);
+              setProfileTargetMember(m);
+              setIsProfileModalOpen(true);
             }}
           />
         )}
@@ -481,24 +474,15 @@ export function App() {
         onMemberCreated={fetchAllData}
       />
 
-      <ThemePickerModal
-        isOpen={isThemePickerOpen}
+      <EditProfileModal
+        isOpen={isProfileModalOpen}
         onClose={() => {
-          setIsThemePickerOpen(false);
-          setThemeTargetMember(null);
+          setIsProfileModalOpen(false);
+          setProfileTargetMember(null);
         }}
         groupCode={currentGroupCode}
-        member={themeTargetMember || currentMember}
-        currentThemeId={
-          themeTargetMember?.avatarUrl?.startsWith('color:')
-            ? themeTargetMember.avatarUrl.replace('color:', '')
-            : currentThemeId
-        }
-        onThemeSelect={(tId) => {
-          if (!themeTargetMember || themeTargetMember.id === currentMember?.id) {
-            handleSelectTheme(tId);
-          }
-        }}
+        member={profileTargetMember || currentMember}
+        onThemeChanged={(hex) => setCurrentThemeHex(hex)}
         onSuccess={fetchAllData}
       />
 
