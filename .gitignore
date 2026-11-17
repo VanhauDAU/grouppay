@@ -1,0 +1,11 @@
+node_modules
+dist
+.wrangler
+.turbo
+.docusaurus
+.cache
+*.log
+.DS_Store
+.env
+.env.local
+.dev.vars

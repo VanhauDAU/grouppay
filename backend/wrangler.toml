@@ -1,0 +1,24 @@
+name = "tinhtien-api"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "production"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tinhtien-db"
+database_id = "tinhtien-db-local"
+
+[durable_objects]
+bindings = [
+  { name = "GROUP_ROOM", class_name = "GroupRoomDO" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["GroupRoomDO"]
+
+[triggers]
+crons = ["0 13 * * 0"] # 20:00 VN time (UTC+7) = 13:00 UTC on Sunday
