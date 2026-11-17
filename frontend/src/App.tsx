@@ -14,7 +14,8 @@ import {
   WifiOff,
   Copy,
   ChevronDown,
-  ArrowLeft
+  ArrowLeft,
+  Palette
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { api } from './services/api.js';
@@ -32,6 +33,8 @@ import { NotificationsModal } from './features/notifications/NotificationsModal.
 import { PaymentModal } from './features/payments/PaymentModal.js';
 import { CreateActivityModal } from './features/activities/CreateActivityModal.js';
 import { BankConfigModal } from './features/members/BankConfigModal.js';
+import { ThemePickerModal } from './features/members/ThemePickerModal.js';
+import { getTheme, getMemberTheme, COLOR_THEMES, DEFAULT_THEME_KEY } from './utils/theme.js';
 import { getInitials, getAvatarColor } from './utils/format.js';
 
 type TabType = 'DASHBOARD' | 'ACTIVITIES' | 'DEBTS' | 'PAYMENTS' | 'MEMBERS' | 'HISTORY';
@@ -77,6 +80,11 @@ export function App() {
   const [bankConfigMember, setBankConfigMember] = useState<any | null>(null);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isThemePickerOpen, setIsThemePickerOpen] = useState(false);
+  const [themeTargetMember, setThemeTargetMember] = useState<any | null>(null);
+  const [currentThemeId, setCurrentThemeId] = useState<string>(() => {
+    return localStorage.getItem('tinhtien_user_theme') || DEFAULT_THEME_KEY;
+  });
 
   // Load toàn bộ dữ liệu nhóm
   const fetchAllData = useCallback(async () => {
@@ -116,6 +124,27 @@ export function App() {
       fetchAllData();
     }
   }, [currentGroupCode, fetchAllData]);
+
+  // Cập nhật theme theo cấu hình thành viên
+  useEffect(() => {
+    if (currentMember) {
+      const mem = members.find((m: any) => m.id === currentMember.id) || currentMember;
+      if (mem.avatarUrl && mem.avatarUrl.startsWith('color:')) {
+        const themeKey = mem.avatarUrl.replace('color:', '');
+        if (COLOR_THEMES[themeKey]) {
+          setCurrentThemeId(themeKey);
+          localStorage.setItem('tinhtien_user_theme', themeKey);
+        }
+      }
+    }
+  }, [currentMember, members]);
+
+  const currentTheme = getTheme(currentThemeId);
+
+  const handleSelectTheme = (themeId: string) => {
+    setCurrentThemeId(themeId);
+    localStorage.setItem('tinhtien_user_theme', themeId);
+  };
 
   // Load history khi chuyển sang tab history
   useEffect(() => {
@@ -233,14 +262,25 @@ export function App() {
               className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 px-3 py-1.5 rounded-full text-xs font-bold transition"
             >
               <div
-                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] ${getAvatarColor(
-                  currentMember?.name || '?'
-                )}`}
+                className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] text-white font-bold"
+                style={{ backgroundColor: currentTheme.hex }}
               >
                 {getInitials(currentMember?.name || '?')}
               </div>
               <span className="max-w-[70px] truncate">{currentMember?.name || 'Chọn tôi'}</span>
               <ChevronDown className="w-3 h-3 text-slate-500" />
+            </button>
+
+            {/* Theme Color Picker Button */}
+            <button
+              onClick={() => {
+                setThemeTargetMember(currentMember);
+                setIsThemePickerOpen(true);
+              }}
+              className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition"
+              title="Đổi màu chủ đạo"
+            >
+              <Palette className="w-4.5 h-4.5" style={{ color: currentTheme.hex }} />
             </button>
 
             {/* Notification bell */}
@@ -271,6 +311,7 @@ export function App() {
         {activeTab === 'DASHBOARD' && (
           <DashboardView
             data={dashboardData}
+            currentTheme={currentTheme}
             onOpenPaymentModal={handleOpenPayment}
             onOpenCreateActivity={() => setIsCreateActivityOpen(true)}
             onConfirmPayment={(pId) => {
@@ -290,6 +331,10 @@ export function App() {
               } else {
                 setIsSelectMemberOpen(true);
               }
+            }}
+            onOpenThemePicker={() => {
+              setThemeTargetMember(currentMember);
+              setIsThemePickerOpen(true);
             }}
             onNavigateToActivities={() => setActiveTab('ACTIVITIES')}
           />
@@ -335,6 +380,10 @@ export function App() {
             isOpenAddModal={isAddMemberOpen}
             onCloseAddModal={() => setIsAddMemberOpen(!isAddMemberOpen)}
             onOpenBankConfig={(m) => setBankConfigMember(m)}
+            onOpenThemePicker={(m) => {
+              setThemeTargetMember(m);
+              setIsThemePickerOpen(true);
+            }}
           />
         )}
 
@@ -355,8 +404,9 @@ export function App() {
         <div className="max-w-2xl mx-auto flex items-center justify-around">
           <button
             onClick={() => setActiveTab('DASHBOARD')}
+            style={activeTab === 'DASHBOARD' ? { color: currentTheme.hex } : undefined}
             className={`flex flex-col items-center py-1 px-2.5 rounded-2xl transition ${
-              activeTab === 'DASHBOARD' ? 'text-emerald-600 font-bold' : 'text-slate-400 font-medium'
+              activeTab === 'DASHBOARD' ? 'font-bold' : 'text-slate-400 font-medium hover:text-slate-600'
             }`}
           >
             <LayoutDashboard className="w-5 h-5 mb-0.5" />
@@ -365,8 +415,9 @@ export function App() {
 
           <button
             onClick={() => setActiveTab('ACTIVITIES')}
+            style={activeTab === 'ACTIVITIES' ? { color: currentTheme.hex } : undefined}
             className={`flex flex-col items-center py-1 px-2.5 rounded-2xl transition ${
-              activeTab === 'ACTIVITIES' ? 'text-emerald-600 font-bold' : 'text-slate-400 font-medium'
+              activeTab === 'ACTIVITIES' ? 'font-bold' : 'text-slate-400 font-medium hover:text-slate-600'
             }`}
           >
             <Receipt className="w-5 h-5 mb-0.5" />
@@ -376,16 +427,18 @@ export function App() {
           {/* Center Quick Add FAB */}
           <button
             onClick={() => setIsCreateActivityOpen(true)}
-            className="w-12 h-12 -mt-5 rounded-full bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-lg shadow-emerald-600/30 active:scale-90 transition transform"
+            className="w-12 h-12 -mt-5 rounded-full text-white flex items-center justify-center shadow-md active:scale-90 transition transform"
+            style={{ backgroundColor: currentTheme.hex }}
             title="Thêm khoản chi tiêu"
           >
-            <Plus className="w-6 h-6" />
+            <Plus className="w-6 h-6 stroke-[2.5]" />
           </button>
 
           <button
             onClick={() => setActiveTab('DEBTS')}
+            style={activeTab === 'DEBTS' ? { color: currentTheme.hex } : undefined}
             className={`flex flex-col items-center py-1 px-2.5 rounded-2xl transition ${
-              activeTab === 'DEBTS' ? 'text-emerald-600 font-bold' : 'text-slate-400 font-medium'
+              activeTab === 'DEBTS' ? 'font-bold' : 'text-slate-400 font-medium hover:text-slate-600'
             }`}
           >
             <Scale className="w-5 h-5 mb-0.5" />
@@ -394,8 +447,9 @@ export function App() {
 
           <button
             onClick={() => setActiveTab('PAYMENTS')}
+            style={activeTab === 'PAYMENTS' ? { color: currentTheme.hex } : undefined}
             className={`flex flex-col items-center py-1 px-2.5 rounded-2xl transition ${
-              activeTab === 'PAYMENTS' ? 'text-emerald-600 font-bold' : 'text-slate-400 font-medium'
+              activeTab === 'PAYMENTS' ? 'font-bold' : 'text-slate-400 font-medium hover:text-slate-600'
             }`}
           >
             <CreditCard className="w-5 h-5 mb-0.5" />
@@ -404,8 +458,9 @@ export function App() {
 
           <button
             onClick={() => setActiveTab('MEMBERS')}
+            style={activeTab === 'MEMBERS' ? { color: currentTheme.hex } : undefined}
             className={`flex flex-col items-center py-1 px-2.5 rounded-2xl transition ${
-              activeTab === 'MEMBERS' ? 'text-emerald-600 font-bold' : 'text-slate-400 font-medium'
+              activeTab === 'MEMBERS' ? 'font-bold' : 'text-slate-400 font-medium hover:text-slate-600'
             }`}
           >
             <Users className="w-5 h-5 mb-0.5" />
@@ -423,6 +478,27 @@ export function App() {
         currentMemberId={currentMember?.id}
         onSelectMember={handleSelectMember}
         onMemberCreated={fetchAllData}
+      />
+
+      <ThemePickerModal
+        isOpen={isThemePickerOpen}
+        onClose={() => {
+          setIsThemePickerOpen(false);
+          setThemeTargetMember(null);
+        }}
+        groupCode={currentGroupCode}
+        member={themeTargetMember || currentMember}
+        currentThemeId={
+          themeTargetMember?.avatarUrl?.startsWith('color:')
+            ? themeTargetMember.avatarUrl.replace('color:', '')
+            : currentThemeId
+        }
+        onThemeSelect={(tId) => {
+          if (!themeTargetMember || themeTargetMember.id === currentMember?.id) {
+            handleSelectTheme(tId);
+          }
+        }}
+        onSuccess={fetchAllData}
       />
 
       <PaymentModal

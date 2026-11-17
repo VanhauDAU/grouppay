@@ -115,20 +115,30 @@ membersRouter.patch('/:groupCode/members/:memberId', requireGroup, async (c) => 
     return c.json({ success: false, error: 'Thành viên không tồn tại' }, 404);
   }
 
-  const { name, status } = parsed.data;
+  const { name, status, avatarUrl } = parsed.data;
   const now = new Date().toISOString();
 
   await db.execute(
     `UPDATE members
-     SET name = COALESCE(?, name), status = COALESCE(?, status), updated_at = ?
+     SET name = COALESCE(?, name),
+         avatar_url = CASE WHEN ? = 1 THEN ? ELSE avatar_url END,
+         status = COALESCE(?, status),
+         updated_at = ?
      WHERE id = ?`,
-    [name || null, status || null, now, memberId]
+    [
+      name || null,
+      avatarUrl !== undefined ? 1 : 0,
+      avatarUrl || null,
+      status || null,
+      now,
+      memberId
+    ]
   );
 
-  await broadcastGroupEvent(c.env, group.id, 'member.updated', memberId, null, { name, status });
+  await broadcastGroupEvent(c.env, group.id, 'member.updated', memberId, null, { name, status, avatarUrl });
   await logAudit(c.env, group.id, null, 'MEMBER_UPDATED', 'member', memberId, {
     old: { name: member.name, status: member.status },
-    new: { name: name || member.name, status: status || member.status }
+    new: { name: name || member.name, status: status || member.status, avatarUrl }
   });
 
   return c.json({ success: true, message: 'Cập nhật thành viên thành công' });

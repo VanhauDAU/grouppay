@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowRight, QrCode, Plus, FileText, CheckCircle2, History } from 'lucide-react';
-import { formatVND, getInitials, getAvatarColor, formatDateTime } from '../../utils/format.js';
+import { formatVND, getInitials, formatDateTime } from '../../utils/format.js';
+import { getMemberTheme } from '../../utils/theme.js';
 import { Modal } from '../../components/common/Modal.js';
 import { api } from '../../services/api.js';
 import { toast } from 'sonner';
@@ -136,9 +137,8 @@ export const DebtsView: React.FC<DebtsViewProps> = ({
                     <div className="flex items-center space-x-3">
                       {/* Avatar debtor */}
                       <div
-                        className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs ${getAvatarColor(
-                          debtorName
-                        )}`}
+                        className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs text-white"
+                        style={{ backgroundColor: getMemberTheme({ name: debtorName }).hex }}
                       >
                         {getInitials(debtorName)}
                       </div>

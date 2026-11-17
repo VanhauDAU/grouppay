@@ -72,7 +72,11 @@ export const api = {
       body: JSON.stringify({ name })
     }),
 
-  updateMember: (groupCode: string, memberId: string, data: { name?: string; status?: string }) =>
+  updateMember: (
+    groupCode: string,
+    memberId: string,
+    data: { name?: string; status?: string; avatarUrl?: string | null }
+  ) =>
     apiRequest(`/groups/${groupCode}/members/${memberId}`, {
       method: 'PATCH',
       groupCode,
