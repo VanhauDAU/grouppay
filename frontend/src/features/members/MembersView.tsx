@@ -178,16 +178,7 @@ export const MembersView: React.FC<MembersViewProps> = ({
                     </div>
 
                     <div className="text-[11px] text-slate-400 mt-0.5">
-                      {bank ? (
-                        <span className="text-emerald-700 font-semibold flex items-center space-x-1">
-                          <Building2 className="w-3 h-3" />
-                          <span>
-                            {bank.bankCode} • {bank.accountNumber}
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">Chưa cài VietQR</span>
-                      )}
+                      {isInactive ? 'Đã ngừng hoạt động' : 'Thành viên nhóm'}
                     </div>
                   </div>
                 </div>
@@ -198,19 +189,11 @@ export const MembersView: React.FC<MembersViewProps> = ({
                     <button
                       onClick={() => onOpenThemePicker(m)}
                       className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition"
-                      title="Chọn màu chủ đạo"
+                      title="Màu chủ đạo & Ảnh đại diện"
                     >
                       <Palette className="w-3.5 h-3.5" style={{ color: theme.hex }} />
                     </button>
                   )}
-
-                  <button
-                    onClick={() => onOpenBankConfig(m)}
-                    className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition"
-                    title="Cài đặt VietQR"
-                  >
-                    <CreditCard className="w-3.5 h-3.5" />
-                  </button>
 
                   <button
                     onClick={() => {

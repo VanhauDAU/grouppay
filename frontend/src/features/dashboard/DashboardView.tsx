@@ -2,7 +2,6 @@ import React from 'react';
 import {
   ArrowUpRight,
   ArrowDownLeft,
-  QrCode,
   Plus,
   CheckCircle2,
   XCircle,
@@ -10,10 +9,7 @@ import {
   AlertCircle,
   Receipt,
   ArrowRight,
-  Palette,
-  Camera,
-  Layers,
-  ChevronRight
+  Send
 } from 'lucide-react';
 import { formatVND } from '../../utils/format.js';
 import { Avatar } from '../../components/common/Avatar.js';
@@ -28,8 +24,8 @@ interface DashboardViewProps {
   onConfirmPayment: (paymentId: string) => void;
   onRejectPayment: (paymentId: string) => void;
   onOpenSelectMember: () => void;
-  onOpenBankConfig: () => void;
-  onOpenProfileModal: () => void;
+  onOpenBankConfig?: () => void;
+  onOpenProfileModal?: () => void;
   onNavigateToActivities?: () => void;
   onNavigateToDebts?: () => void;
 }
@@ -90,28 +86,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             style={{ backgroundColor: `${currentTheme.hex}15` }}
           />
 
-          {/* Header cá nhân: Avatar, Tên, Nút đổi ảnh & màu */}
+          {/* Header cá nhân: Avatar, Tên */}
           <div className="flex items-center justify-between pb-3.5 border-b border-slate-200/60 relative z-10">
             <div className="flex items-center space-x-3">
-              <button
-                type="button"
-                onClick={onOpenProfileModal}
-                title="Bấm để đổi ảnh đại diện & màu chủ đạo"
-                className="relative group focus:outline-none transition transform active:scale-95"
-              >
-                <Avatar
-                  name={personal.memberName}
-                  avatarUrl={personal.avatarUrl}
-                  size="md"
-                  className="ring-2 ring-white shadow-xs group-hover:scale-105 transition"
-                />
-                <div
-                  className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border border-white flex items-center justify-center shadow-2xs text-white"
-                  style={{ backgroundColor: currentTheme.hex }}
-                >
-                  <Camera className="w-2.5 h-2.5" />
-                </div>
-              </button>
+              <Avatar
+                name={personal.memberName}
+                avatarUrl={personal.avatarUrl}
+                size="md"
+                className="ring-2 ring-white shadow-xs"
+              />
 
               <div>
                 <div className="flex items-center space-x-1.5">
@@ -125,24 +108,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
                 <span className="text-[11px] text-slate-400">Tài khoản thao tác</span>
               </div>
-            </div>
-
-            <div className="flex items-center space-x-1.5">
-              <button
-                onClick={onOpenProfileModal}
-                className="text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 flex items-center space-x-1 shadow-2xs transition active:scale-95"
-                title="Đổi màu sắc & ảnh đại diện"
-              >
-                <Palette className="w-3.5 h-3.5" style={{ color: currentTheme.hex }} />
-                <span className="hidden sm:inline">Màu & Ảnh</span>
-              </button>
-
-              <button
-                onClick={onOpenSelectMember}
-                className="text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 transition active:scale-95 shadow-2xs"
-              >
-                Đổi vai trò
-              </button>
             </div>
           </div>
 
@@ -198,28 +163,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           {/* Thao tác nhanh tinh gọn */}
-          <div className="grid grid-cols-2 gap-2.5 mt-4 pt-3.5 border-t border-slate-200/60 relative z-10">
-            {personal.totalOwedToOthers > 0 ? (
+          <div className="flex items-center space-x-2.5 mt-4 pt-3.5 border-t border-slate-200/60 relative z-10">
+            {personal.totalOwedToOthers > 0 && (
               <button
                 onClick={() => onOpenPaymentModal()}
-                className="bg-slate-900 hover:bg-slate-800 text-white font-extrabold py-3 px-3 rounded-2xl text-xs flex items-center justify-center space-x-1.5 shadow-sm transition active:scale-95"
+                className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-extrabold py-3 px-3 rounded-2xl text-xs flex items-center justify-center space-x-1.5 shadow-sm transition active:scale-95"
               >
-                <QrCode className="w-4 h-4 text-emerald-400" />
-                <span>Trả nợ VietQR</span>
-              </button>
-            ) : (
-              <button
-                onClick={onOpenBankConfig}
-                className="bg-white hover:bg-slate-50 text-slate-800 font-bold py-3 px-3 rounded-2xl text-xs flex items-center justify-center space-x-1.5 border border-slate-200 shadow-2xs transition active:scale-95"
-              >
-                <QrCode className="w-4 h-4 text-slate-500" />
-                <span>Cài đặt VietQR</span>
+                <Send className="w-4 h-4 text-emerald-400" />
+                <span>Báo đã trả tiền</span>
               </button>
             )}
 
             <button
               onClick={onOpenCreateActivity}
-              className="text-white font-extrabold py-3 px-3 rounded-2xl text-xs flex items-center justify-center space-x-1.5 shadow-md transition transform active:scale-95"
+              className={`text-white font-extrabold py-3 px-3 rounded-2xl text-xs flex items-center justify-center space-x-1.5 shadow-md transition transform active:scale-95 ${
+                personal.totalOwedToOthers > 0 ? 'flex-1' : 'w-full'
+              }`}
               style={{ backgroundColor: currentTheme.hex }}
             >
               <Plus className="w-4 h-4 stroke-[3]" />
@@ -236,7 +195,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
             <div>
               <h4 className="text-xs font-bold text-slate-800">Bạn chưa chọn tên trong nhóm</h4>
-              <p className="text-[11px] text-slate-500">Chọn tên để xem công nợ cá nhân và tạo QR nhận tiền.</p>
+              <p className="text-[11px] text-slate-500">Chọn tên để xem công nợ cá nhân và ghi nhận trả tiền.</p>
             </div>
           </div>
           <button
@@ -318,10 +277,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                 <button
                   onClick={() => onOpenPaymentModal(item.creditorId, item.amount)}
-                  className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center space-x-1 transition active:scale-95"
+                  className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition active:scale-95 shadow-2xs"
                 >
-                  <QrCode className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Chuyển</span>
+                  <Send className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Báo trả</span>
                 </button>
               </div>
             ))}

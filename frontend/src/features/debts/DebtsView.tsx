@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, QrCode, Plus, FileText, CheckCircle2, History, Receipt } from 'lucide-react';
+import { ArrowRight, Send, Plus, FileText, CheckCircle2, History, Receipt } from 'lucide-react';
 import { formatVND, getInitials, formatDateTime } from '../../utils/format.js';
 import { getMemberTheme } from '../../utils/theme.js';
 import { Modal } from '../../components/common/Modal.js';
@@ -179,9 +179,9 @@ export const DebtsView: React.FC<DebtsViewProps> = ({
                             onOpenPaymentModal(item.netCreditorId, item.netAmount);
                           }}
                           className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs p-2 rounded-xl transition shadow-2xs"
-                          title="Trả nợ"
+                          title="Báo trả nợ"
                         >
-                          <QrCode className="w-4 h-4 text-emerald-400" />
+                          <Send className="w-4 h-4 text-emerald-400" />
                         </button>
                       )}
                     </div>

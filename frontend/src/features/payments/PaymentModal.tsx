@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from '../../components/common/Modal.js';
-import { VietQrCard } from '../../components/common/VietQrCard.js';
+import { Avatar } from '../../components/common/Avatar.js';
 import { formatVND } from '../../utils/format.js';
 import { api } from '../../services/api.js';
 import { toast } from 'sonner';
+import { Send, CheckCircle2, DollarSign } from 'lucide-react';
 
 interface Member {
   id: string;
   name: string;
-  bankAccount?: any;
+  avatarUrl?: string | null;
 }
 
 interface PaymentModalProps {
@@ -32,15 +33,31 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   initialAmount,
   onPaymentSuccess
 }) => {
-  const [recipientId, setRecipientId] = useState(initialRecipientId || members[0]?.id || '');
+  const otherMembers = members.filter((m) => m.id !== currentMemberId);
+  const [recipientId, setRecipientId] = useState<string>(initialRecipientId || otherMembers[0]?.id || '');
   const [amount, setAmount] = useState<number | ''>(initialAmount || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const recipient = members.find((m) => m.id === recipientId);
-  const bank = recipient?.bankAccount;
+  useEffect(() => {
+    if (initialRecipientId) {
+      setRecipientId(initialRecipientId);
+    } else if (otherMembers.length > 0 && !recipientId) {
+      setRecipientId(otherMembers[0].id);
+    }
+  }, [initialRecipientId, otherMembers]);
 
-  // Nội dung chuyển khoản chuẩn hóa
-  const transferMemo = `TT NHOM ${groupCode.toUpperCase()}`;
+  useEffect(() => {
+    if (initialAmount && initialAmount > 0) {
+      setAmount(initialAmount);
+    }
+  }, [initialAmount]);
+
+  const recipient = members.find((m) => m.id === recipientId);
+
+  const handleQuickAdd = (value: number) => {
+    const current = typeof amount === 'number' ? amount : 0;
+    setAmount(current + value);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,12 +67,16 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     }
     const amt = Number(amount);
     if (!amt || amt <= 0) {
-      toast.error('Vui lòng nhập số tiền thanh toán hợp lệ');
+      toast.error('Vui lòng nhập số tiền đã trả hợp lệ');
+      return;
+    }
+
+    if (!recipientId) {
+      toast.error('Vui lòng chọn người nhận tiền');
       return;
     }
 
     setIsSubmitting(true);
-    // Sinh idempotency key duy nhất cho lần thanh toán này
     const idempotencyKey = `pay_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     const res = await api.createPayment(groupCode, currentMemberId, {
@@ -67,78 +88,141 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setIsSubmitting(false);
 
     if (res.success) {
-      toast.success('Đã gửi thông báo chuyển tiền! Chờ người nhận xác nhận.');
+      toast.success(`Đã báo trả tiền cho ${recipient?.name || 'người nhận'}! Đang chờ xác nhận.`);
       onPaymentSuccess();
       onClose();
     } else {
-      toast.error(res.error || 'Không thể tạo thanh toán');
+      toast.error(res.error || 'Không thể gửi thông báo trả tiền');
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Chuyển khoản thanh toán nợ" maxWidth="md">
+    <Modal isOpen={isOpen} onClose={onClose} title="Báo đã trả tiền" maxWidth="md">
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Chọn người nhận */}
+        {/* Người nhận tiền */}
         <div>
-          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-            Người nhận tiền *
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+            Người nhận tiền
           </label>
-          <select
-            value={recipientId}
-            onChange={(e) => setRecipientId(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-emerald-500 transition"
-          >
-            {members
-              .filter((m) => m.id !== currentMemberId)
-              .map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name} {m.bankAccount ? `(${m.bankAccount.bankCode})` : '(Chưa có STK)'}
-                </option>
-              ))}
-          </select>
+          <div className="grid grid-cols-1 gap-2">
+            {otherMembers.length > 1 ? (
+              <div className="relative">
+                <select
+                  value={recipientId}
+                  onChange={(e) => setRecipientId(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500 transition appearance-none"
+                >
+                  {otherMembers.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-xs">
+                  ▼
+                </div>
+              </div>
+            ) : recipient ? (
+              <div className="flex items-center space-x-3 bg-slate-50 border border-slate-200 p-3 rounded-2xl">
+                <Avatar name={recipient.name} avatarUrl={recipient.avatarUrl} size="sm" />
+                <span className="font-bold text-slate-800 text-sm">{recipient.name}</span>
+              </div>
+            ) : (
+              <div className="text-xs text-slate-400">Không có thành viên khác trong nhóm</div>
+            )}
+          </div>
         </div>
 
-        {/* Nhập số tiền */}
+        {/* Ô nhập số tiền lớn */}
         <div>
-          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-            Số tiền chuyển (VND) *
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+            Số tiền đã trả (đ) *
           </label>
-          <input
-            type="number"
-            placeholder="Ví dụ: 100000"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value ? Number(e.target.value) : '')}
-            className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-emerald-500 transition"
-            required
-          />
-        </div>
-
-        {/* Hiển thị VietQR Card nếu người nhận đã có thông tin ngân hàng */}
-        {bank && bank.isQrEnabled && bank.bankBin && bank.accountNumber ? (
-          <div className="pt-2">
-            <VietQrCard
-              bankBin={bank.bankBin}
-              bankCode={bank.bankCode}
-              bankName={bank.bankName}
-              accountNumber={bank.accountNumber}
-              accountHolder={bank.accountHolder}
-              amount={typeof amount === 'number' && amount > 0 ? amount : undefined}
-              memo={transferMemo}
+          <div className="relative">
+            <input
+              type="number"
+              placeholder="0"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value ? Number(e.target.value) : '')}
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-2xl font-black text-slate-900 focus:outline-none focus:border-emerald-500 transition tracking-tight"
+              required
+              min={1}
             />
+            {amount && Number(amount) > 0 ? (
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
+                {formatVND(Number(amount))}
+              </div>
+            ) : null}
           </div>
-        ) : (
-          <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl text-xs text-amber-800">
-            Người nhận chưa cài đặt tài khoản ngân hàng. Bạn có thể thanh toán tiền mặt hoặc chuyển khoản thủ công, sau đó bấm nút bên dưới để báo cho người nhận.
-          </div>
-        )}
 
-        <div className="pt-3">
+          {/* Phím tắt chọn nhanh */}
+          <div className="flex flex-wrap gap-1.5 mt-2.5">
+            {initialAmount && initialAmount > 0 && initialAmount !== amount && (
+              <button
+                type="button"
+                onClick={() => setAmount(initialAmount)}
+                className="bg-emerald-50 text-emerald-700 border border-emerald-200/80 hover:bg-emerald-100 text-[11px] font-bold px-2.5 py-1.5 rounded-xl transition"
+              >
+                Trả hết ({formatVND(initialAmount)})
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => handleQuickAdd(50000)}
+              className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold px-2.5 py-1.5 rounded-xl transition"
+            >
+              +50k
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickAdd(100000)}
+              className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold px-2.5 py-1.5 rounded-xl transition"
+            >
+              +100k
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickAdd(200000)}
+              className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold px-2.5 py-1.5 rounded-xl transition"
+            >
+              +200k
+            </button>
+            <button
+              type="button"
+              onClick={() => handleQuickAdd(500000)}
+              className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold px-2.5 py-1.5 rounded-xl transition"
+            >
+              +500k
+            </button>
+            {amount && (
+              <button
+                type="button"
+                onClick={() => setAmount('')}
+                className="bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-slate-500 text-[11px] font-bold px-2.5 py-1.5 rounded-xl transition"
+              >
+                Xóa
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Hướng dẫn cơ chế xác nhận */}
+        <div className="bg-emerald-50/70 border border-emerald-200/80 p-3.5 rounded-2xl flex items-start space-x-2.5">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+          <div className="text-xs text-emerald-900 leading-relaxed">
+            Sau khi bấm gửi, hệ thống sẽ báo cho <b>{recipient?.name || 'người nhận'}</b>. Khi người đó bấm <b>"Đã nhận"</b>, khoản nợ này sẽ chính thức được trừ.
+          </div>
+        </div>
+
+        {/* Nút hành động chính */}
+        <div className="pt-2">
           <button
             type="submit"
             disabled={isSubmitting || !amount || Number(amount) <= 0}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-2xl shadow-lg shadow-emerald-600/25 transition active:scale-[0.98] disabled:opacity-50"
+            className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-2xl shadow-lg transition active:scale-[0.98] disabled:opacity-50 flex items-center justify-center space-x-2"
           >
-            {isSubmitting ? 'Đang gửi thông báo...' : 'Tôi đã chuyển tiền xong (Báo người nhận)'}
+            <Send className="w-4 h-4 text-emerald-400" />
+            <span>{isSubmitting ? 'Đang gửi...' : 'Tôi đã trả tiền xong (Báo người nhận)'}</span>
           </button>
         </div>
       </form>

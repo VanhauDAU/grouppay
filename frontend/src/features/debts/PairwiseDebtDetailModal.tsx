@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   ArrowRight,
-  QrCode,
+  Send,
   Plus,
   Minus,
   Equal,
@@ -155,8 +155,8 @@ export const PairwiseDebtDetailModal: React.FC<PairwiseDebtDetailModalProps> = (
                 }}
                 className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center space-x-1.5 transition active:scale-95 shadow-xs"
               >
-                <QrCode className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Trả nợ ngay</span>
+                <Send className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Báo trả nợ</span>
               </button>
             )}
           </div>
