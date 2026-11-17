@@ -37,11 +37,18 @@ debtsRouter.get('/:groupCode/debts', requireGroup, async (c) => {
     updated_at: string;
     debtor_name: string;
     creditor_name: string;
+    activity_title: string | null;
+    activity_occurred_at: string | null;
   }>(
-    `SELECT ob.*, m1.name as debtor_name, m2.name as creditor_name
+    `SELECT ob.*,
+            m1.name as debtor_name,
+            m2.name as creditor_name,
+            a.title as activity_title,
+            a.occurred_at as activity_occurred_at
      FROM debt_obligations ob
      JOIN members m1 ON m1.id = ob.debtor_member_id
      JOIN members m2 ON m2.id = ob.creditor_member_id
+     LEFT JOIN activities a ON a.id = ob.source_id AND ob.source_type = 'EXPENSE'
      WHERE ob.group_id = ? AND ob.status != 'CANCELLED'
      ORDER BY ob.created_at DESC`,
     [group.id]
@@ -51,11 +58,15 @@ debtsRouter.get('/:groupCode/debts', requireGroup, async (c) => {
     ...ob,
     debtorMemberId: ob.debtor_member_id,
     creditorMemberId: ob.creditor_member_id,
+    debtorName: ob.debtor_name,
+    creditorName: ob.creditor_name,
     originalAmount: ob.original_amount,
     settledAmount: ob.settled_amount,
     remainingAmount: Math.max(0, ob.original_amount - ob.settled_amount),
     sourceType: ob.source_type,
     sourceId: ob.source_id,
+    activityTitle: ob.activity_title || (ob.source_type === 'INITIAL_DEBT' ? 'Công nợ ban đầu' : 'Khoản chi'),
+    activityOccurredAt: ob.activity_occurred_at || ob.created_at,
     createdAt: ob.created_at,
     updatedAt: ob.updated_at
   }));

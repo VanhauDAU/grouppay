@@ -337,6 +337,7 @@ export function App() {
               setIsThemePickerOpen(true);
             }}
             onNavigateToActivities={() => setActiveTab('ACTIVITIES')}
+            onNavigateToDebts={() => setActiveTab('DEBTS')}
           />
         )}
 

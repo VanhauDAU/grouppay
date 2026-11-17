@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { ArrowRight, QrCode, Plus, FileText, CheckCircle2, History } from 'lucide-react';
+import { ArrowRight, QrCode, Plus, FileText, CheckCircle2, History, Receipt } from 'lucide-react';
 import { formatVND, getInitials, formatDateTime } from '../../utils/format.js';
 import { getMemberTheme } from '../../utils/theme.js';
 import { Modal } from '../../components/common/Modal.js';
+import { PairwiseDebtDetailModal } from './PairwiseDebtDetailModal.js';
 import { api } from '../../services/api.js';
 import { toast } from 'sonner';
 
@@ -31,6 +32,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'PAIRWISE' | 'OBLIGATIONS'>('PAIRWISE');
   const [isInitialDebtModalOpen, setIsInitialDebtModalOpen] = useState(false);
+  const [selectedPair, setSelectedPair] = useState<any | null>(null);
 
   // Form nhập nợ ban đầu
   const [debtorId, setDebtorId] = useState(members[0]?.id || '');
@@ -129,8 +131,9 @@ export const DebtsView: React.FC<DebtsViewProps> = ({
               return (
                 <div
                   key={idx}
-                  className={`bg-white p-4 rounded-3xl border transition shadow-sm ${
-                    isMeDebtor ? 'border-rose-200 bg-rose-50/20' : 'border-slate-200/80'
+                  onClick={() => setSelectedPair(item)}
+                  className={`bg-white p-3.5 rounded-2xl border transition shadow-2xs cursor-pointer hover:border-slate-300 ${
+                    isMeDebtor ? 'border-rose-200/80 bg-rose-50/20' : 'border-slate-200/80'
                   }`}
                 >
                   <div className="flex items-center justify-between">
@@ -152,7 +155,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({
                         <div className="text-slate-400 mt-0.5">
                           {item.aOwesB > 0 && item.bOwesA > 0 ? (
                             <span>
-                              (Bù trừ: {formatVND(item.aOwesB)} và {formatVND(item.bOwesA)})
+                              (Bù trừ 2 chiều: {formatVND(item.aOwesB)} và {formatVND(item.bOwesA)})
                             </span>
                           ) : (
                             <span>Công nợ trực tiếp</span>
@@ -161,21 +164,38 @@ export const DebtsView: React.FC<DebtsViewProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex items-center space-x-3">
-                      <span className="text-base font-extrabold text-rose-500">
-                        {formatVND(item.netAmount)}
-                      </span>
+                    <div className="flex items-center space-x-2.5">
+                      <div className="text-right">
+                        <span className="text-sm font-extrabold text-rose-500 block">
+                          {formatVND(item.netAmount)}
+                        </span>
+                        <span className="text-[10px] text-slate-400">còn nợ ròng</span>
+                      </div>
 
                       {isMeDebtor && (
                         <button
-                          onClick={() => onOpenPaymentModal(item.netCreditorId, item.netAmount)}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs p-2 rounded-xl transition shadow-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenPaymentModal(item.netCreditorId, item.netAmount);
+                          }}
+                          className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs p-2 rounded-xl transition shadow-2xs"
                           title="Trả nợ"
                         >
-                          <QrCode className="w-4 h-4" />
+                          <QrCode className="w-4 h-4 text-emerald-400" />
                         </button>
                       )}
                     </div>
+                  </div>
+
+                  <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                    <span className="flex items-center space-x-1">
+                      <Receipt className="w-3 h-3 text-slate-400" />
+                      <span>Xem sổ cộng trừ nợ chi tiết</span>
+                    </span>
+                    <span className="font-semibold text-slate-700 flex items-center space-x-0.5">
+                      <span>Chi tiết</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </span>
                   </div>
                 </div>
               );
@@ -314,6 +334,16 @@ export const DebtsView: React.FC<DebtsViewProps> = ({
           </div>
         </form>
       </Modal>
+
+      {/* Modal Chi tiết đối chiếu nợ từng cá nhân */}
+      <PairwiseDebtDetailModal
+        isOpen={Boolean(selectedPair)}
+        onClose={() => setSelectedPair(null)}
+        pair={selectedPair}
+        obligations={obligations}
+        currentMemberId={currentMemberId}
+        onOpenPaymentModal={onOpenPaymentModal}
+      />
     </div>
   );
 };

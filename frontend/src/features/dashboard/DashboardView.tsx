@@ -28,6 +28,7 @@ interface DashboardViewProps {
   onOpenBankConfig: () => void;
   onOpenThemePicker: () => void;
   onNavigateToActivities?: () => void;
+  onNavigateToDebts?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -40,7 +41,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenSelectMember,
   onOpenBankConfig,
   onOpenThemePicker,
-  onNavigateToActivities
+  onNavigateToActivities,
+  onNavigateToDebts
 }) => {
   const { personal, group, netBalances, settlementProposals, recentActivities } = data || {};
 
@@ -296,6 +298,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               );
             })}
           </div>
+
+          {onNavigateToDebts && (
+            <button
+              type="button"
+              onClick={onNavigateToDebts}
+              className="w-full pt-1.5 text-center text-[11px] font-bold text-slate-500 hover:text-slate-800 flex items-center justify-center space-x-1"
+            >
+              <Receipt className="w-3 h-3 text-slate-400" />
+              <span>Xem chi tiết cộng trừ các khoản nợ $\rightarrow$</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -340,6 +353,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               );
             })}
           </div>
+
+          {onNavigateToDebts && (
+            <button
+              type="button"
+              onClick={onNavigateToDebts}
+              className="w-full pt-1.5 text-center text-[11px] font-bold text-slate-500 hover:text-slate-800 flex items-center justify-center space-x-1"
+            >
+              <Receipt className="w-3 h-3 text-slate-400" />
+              <span>Xem chi tiết cộng trừ các khoản nợ $\rightarrow$</span>
+            </button>
+          )}
         </div>
       )}
 
