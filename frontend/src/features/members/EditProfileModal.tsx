@@ -188,7 +188,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
               <div className="flex items-center space-x-1.5">
                 <span className="font-bold text-slate-800 text-sm">{member.name}</span>
                 <span
-                  className="text-[10px] font-bold px-2 py-0.2 rounded-full text-white shadow-2xs"
+                  className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white shadow-2xs"
                   style={{ backgroundColor: selectedHex }}
                 >
                   Xem trước

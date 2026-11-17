@@ -117,7 +117,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="flex items-center space-x-1.5">
                   <span className="text-sm font-extrabold text-slate-900">{personal.memberName}</span>
                   <span
-                    className="text-[10px] font-bold px-2 py-0.2 rounded-full text-white shadow-2xs"
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white shadow-2xs"
                     style={{ backgroundColor: currentTheme.hex }}
                   >
                     Bạn
@@ -292,7 +292,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* 3. Người bạn cần chuyển tiền */}
       {personal?.peopleIOwe && personal.peopleIOwe.length > 0 && (
-        <div className="bg-white p-4.5 rounded-3xl border border-slate-200/80 shadow-xs space-y-2.5">
+        <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
               Người bạn cần chuyển tiền ({personal.peopleIOwe.length})
@@ -342,7 +342,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* 4. Những người đang nợ bạn */}
       {personal?.peopleOweMe && personal.peopleOweMe.length > 0 && (
-        <div className="bg-white p-4.5 rounded-3xl border border-slate-200/80 shadow-xs space-y-2.5">
+        <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
               Những người đang nợ bạn ({personal.peopleOweMe.length})
@@ -389,8 +389,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* 5. Hoạt động chi tiêu gần đây */}
       {recentActivities && recentActivities.length > 0 && (
-        <div className="bg-white p-4.5 rounded-3xl border border-slate-200/80 shadow-xs space-y-2.5">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+        <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
+          <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
             <div className="flex items-center space-x-2">
               <div
                 className="w-6 h-6 rounded-lg flex items-center justify-center shadow-2xs"
@@ -435,7 +435,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* 6. Gợi ý chuyển tiền tối giản */}
       {settlementProposals && settlementProposals.length > 0 && (
-        <div className="bg-white p-4.5 rounded-3xl border border-slate-200/80 shadow-xs space-y-2.5">
+        <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-1.5 text-slate-800 font-bold text-xs uppercase tracking-wider">
               <Sparkles className="w-3.5 h-3.5 text-amber-500" />
@@ -469,7 +469,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       )}
 
       {/* 7. Tổng quan toàn nhóm */}
-      <div className="bg-white p-4.5 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
+      <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
         <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
           <div>
             <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tổng quan nhóm</h4>

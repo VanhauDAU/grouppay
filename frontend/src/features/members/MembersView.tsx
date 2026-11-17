@@ -166,12 +166,12 @@ export const MembersView: React.FC<MembersViewProps> = ({
                     <div className="flex items-center space-x-1.5">
                       <span className="font-bold text-slate-900 text-xs">{m.name}</span>
                       {isMe && (
-                        <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.2 rounded-full">
+                        <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full">
                           Bạn
                         </span>
                       )}
                       {isInactive && (
-                        <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-0.2 rounded-full">
+                        <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
                           Đã ẩn
                         </span>
                       )}

@@ -273,7 +273,7 @@ export function App() {
               className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition"
               title="Đổi màu chủ đạo & Ảnh đại diện"
             >
-              <Palette className="w-4.5 h-4.5" style={{ color: currentTheme.hex }} />
+              <Palette className="w-4 h-4" style={{ color: currentTheme.hex }} />
             </button>
 
             {/* Notification bell */}
