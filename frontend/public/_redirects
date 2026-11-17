@@ -1,0 +1,2 @@
+/api/*  https://sononghiatinh-api.levanhau114400.workers.dev/api/:splat  200
+/*      /index.html                                                    200

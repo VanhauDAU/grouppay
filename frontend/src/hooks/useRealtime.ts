@@ -53,10 +53,23 @@ export function useRealtime(
       wsRef.current = null;
     }
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.host;
     const mIdParam = memberId ? `?memberId=${encodeURIComponent(memberId)}` : '';
-    const wsUrl = `${protocol}//${host}/api/groups/${groupCode}/ws${mIdParam}`;
+    const apiUrl = import.meta.env.VITE_API_URL;
+    let wsUrl: string;
+
+    if (apiUrl) {
+      try {
+        const u = new URL(apiUrl);
+        const wsProtocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
+        wsUrl = `${wsProtocol}//${u.host}/api/groups/${groupCode}/ws${mIdParam}`;
+      } catch {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        wsUrl = `${protocol}//${window.location.host}/api/groups/${groupCode}/ws${mIdParam}`;
+      }
+    } else {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      wsUrl = `${protocol}//${window.location.host}/api/groups/${groupCode}/ws${mIdParam}`;
+    }
 
     try {
       const ws = new WebSocket(wsUrl);

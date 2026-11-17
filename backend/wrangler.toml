@@ -1,4 +1,4 @@
-name = "tinhtien-api"
+name = "sononghiatinh-api"
 main = "src/index.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
@@ -8,8 +8,8 @@ ENVIRONMENT = "production"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "tinhtien-db"
-database_id = "tinhtien-db-local"
+database_name = "sononghiatinh-db"
+database_id = "ba32bcf2-eecd-48cd-ba5c-bf41dd89f9c1"
 
 [durable_objects]
 bindings = [
@@ -18,7 +18,7 @@ bindings = [
 
 [[migrations]]
 tag = "v1"
-new_classes = ["GroupRoomDO"]
+new_sqlite_classes = ["GroupRoomDO"]
 
 [triggers]
-crons = ["0 13 * * 0"] # 20:00 VN time (UTC+7) = 13:00 UTC on Sunday
+crons = ["0 13 * * SUN"] # 20:00 VN time (UTC+7) = 13:00 UTC on Sunday
