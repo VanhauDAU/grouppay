@@ -30,6 +30,8 @@ import { HistoryView } from './features/history/HistoryView.js';
 import { ExportModal } from './features/export/ExportModal.js';
 import { NotificationsModal } from './features/notifications/NotificationsModal.js';
 import { PaymentModal } from './features/payments/PaymentModal.js';
+import { CreateActivityModal } from './features/activities/CreateActivityModal.js';
+import { BankConfigModal } from './features/members/BankConfigModal.js';
 import { getInitials, getAvatarColor } from './utils/format.js';
 
 type TabType = 'DASHBOARD' | 'ACTIVITIES' | 'DEBTS' | 'PAYMENTS' | 'MEMBERS' | 'HISTORY';
@@ -72,6 +74,7 @@ export function App() {
   const [paymentDefaultAmount, setPaymentDefaultAmount] = useState<number | undefined>(undefined);
   const [isCreateActivityOpen, setIsCreateActivityOpen] = useState(false);
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
+  const [bankConfigMember, setBankConfigMember] = useState<any | null>(null);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
@@ -280,7 +283,14 @@ export function App() {
               }
             }}
             onOpenSelectMember={() => setIsSelectMemberOpen(true)}
-            onOpenBankConfig={() => setIsAddMemberOpen(true)}
+            onOpenBankConfig={() => {
+              const current = members.find((m: any) => m.id === currentMember?.id) || currentMember;
+              if (current) {
+                setBankConfigMember(current);
+              } else {
+                setIsSelectMemberOpen(true);
+              }
+            }}
           />
         )}
 
@@ -291,8 +301,7 @@ export function App() {
             members={members}
             activities={activities}
             onRefresh={fetchAllData}
-            isOpenCreateModal={isCreateActivityOpen}
-            onCloseCreateModal={() => setIsCreateActivityOpen(!isCreateActivityOpen)}
+            onOpenCreateModal={() => setIsCreateActivityOpen(true)}
           />
         )}
 
@@ -324,6 +333,7 @@ export function App() {
             onRefresh={fetchAllData}
             isOpenAddModal={isAddMemberOpen}
             onCloseAddModal={() => setIsAddMemberOpen(!isAddMemberOpen)}
+            onOpenBankConfig={(m) => setBankConfigMember(m)}
           />
         )}
 
@@ -423,6 +433,23 @@ export function App() {
         initialRecipientId={paymentRecipientId}
         initialAmount={paymentDefaultAmount}
         onPaymentSuccess={fetchAllData}
+      />
+
+      <CreateActivityModal
+        isOpen={isCreateActivityOpen}
+        onClose={() => setIsCreateActivityOpen(false)}
+        groupCode={currentGroupCode}
+        currentMemberId={currentMember?.id}
+        members={members}
+        onSuccess={fetchAllData}
+      />
+
+      <BankConfigModal
+        isOpen={Boolean(bankConfigMember)}
+        onClose={() => setBankConfigMember(null)}
+        groupCode={currentGroupCode}
+        member={bankConfigMember}
+        onSuccess={fetchAllData}
       />
 
       <ExportModal

@@ -5,10 +5,8 @@ import {
   Edit2,
   UserX,
   UserCheck,
-  Check,
   Building2
 } from 'lucide-react';
-import { VIETNAM_BANKS } from '@tinhtien/shared';
 import { getInitials, getAvatarColor } from '../../utils/format.js';
 import { Modal } from '../../components/common/Modal.js';
 import { api } from '../../services/api.js';
@@ -28,6 +26,7 @@ interface MembersViewProps {
   onRefresh: () => void;
   isOpenAddModal: boolean;
   onCloseAddModal: () => void;
+  onOpenBankConfig: (member: Member) => void;
 }
 
 export const MembersView: React.FC<MembersViewProps> = ({
@@ -36,7 +35,8 @@ export const MembersView: React.FC<MembersViewProps> = ({
   members,
   onRefresh,
   isOpenAddModal,
-  onCloseAddModal
+  onCloseAddModal,
+  onOpenBankConfig
 }) => {
   // Thêm thành viên
   const [newMemberName, setNewMemberName] = useState('');
@@ -45,12 +45,6 @@ export const MembersView: React.FC<MembersViewProps> = ({
   // Đổi tên
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [editName, setEditName] = useState('');
-
-  // Cấu hình ngân hàng
-  const [bankMember, setBankMember] = useState<Member | null>(null);
-  const [selectedBankBin, setSelectedBankBin] = useState(VIETNAM_BANKS[0].bin);
-  const [accountNumber, setAccountNumber] = useState('');
-  const [accountHolder, setAccountHolder] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleAddMember = async (e: React.FormEvent) => {
@@ -103,53 +97,6 @@ export const MembersView: React.FC<MembersViewProps> = ({
       onRefresh();
     } else {
       toast.error(res.error || 'Lỗi khi cập nhật trạng thái');
-    }
-  };
-
-  const handleOpenBankConfig = (member: Member) => {
-    setBankMember(member);
-    if (member.bankAccount) {
-      setSelectedBankBin(member.bankAccount.bankBin || VIETNAM_BANKS[0].bin);
-      setAccountNumber(member.bankAccount.accountNumber || '');
-      setAccountHolder(member.bankAccount.accountHolder || '');
-    } else {
-      setSelectedBankBin(VIETNAM_BANKS[0].bin);
-      setAccountNumber('');
-      setAccountHolder(member.name.toUpperCase());
-    }
-  };
-
-  const handleSaveBank = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bankMember) return;
-    if (!accountNumber.trim()) {
-      toast.error('Vui lòng nhập số tài khoản');
-      return;
-    }
-    if (!accountHolder.trim()) {
-      toast.error('Vui lòng nhập tên chủ tài khoản');
-      return;
-    }
-
-    const selectedBank = VIETNAM_BANKS.find((b) => b.bin === selectedBankBin) || VIETNAM_BANKS[0];
-
-    setIsSubmitting(true);
-    const res = await api.saveMemberBank(groupCode, bankMember.id, {
-      bankBin: selectedBank.bin,
-      bankCode: selectedBank.code,
-      bankName: selectedBank.shortName,
-      accountNumber: accountNumber.trim(),
-      accountHolder: accountHolder.trim().toUpperCase(),
-      isQrEnabled: true
-    });
-    setIsSubmitting(false);
-
-    if (res.success) {
-      toast.success('Đã lưu cấu hình tài khoản VietQR');
-      setBankMember(null);
-      onRefresh();
-    } else {
-      toast.error(res.error || 'Không thể lưu ngân hàng');
     }
   };
 
@@ -224,7 +171,7 @@ export const MembersView: React.FC<MembersViewProps> = ({
                 {/* Actions */}
                 <div className="flex items-center space-x-1.5">
                   <button
-                    onClick={() => handleOpenBankConfig(m)}
+                    onClick={() => onOpenBankConfig(m)}
                     className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition"
                     title="Cài đặt tài khoản ngân hàng / VietQR"
                   >
@@ -316,74 +263,6 @@ export const MembersView: React.FC<MembersViewProps> = ({
               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-2xl transition disabled:opacity-50"
             >
               {isSubmitting ? 'Đang lưu...' : 'Lưu tên mới'}
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Modal Cài đặt tài khoản ngân hàng nhận VietQR */}
-      <Modal
-        isOpen={Boolean(bankMember)}
-        onClose={() => setBankMember(null)}
-        title={`Cài đặt VietQR cho ${bankMember?.name}`}
-      >
-        <form onSubmit={handleSaveBank} className="space-y-4">
-          <p className="text-xs text-slate-500">
-            Thông tin này dùng để tự động tạo mã QR chuẩn VietQR khi người khác trả nợ cho {bankMember?.name}.
-          </p>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-              Ngân hàng thụ hưởng *
-            </label>
-            <select
-              value={selectedBankBin}
-              onChange={(e) => setSelectedBankBin(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-semibold focus:outline-none focus:border-emerald-500"
-            >
-              {VIETNAM_BANKS.map((b) => (
-                <option key={b.bin} value={b.bin}>
-                  {b.shortName} - {b.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-              Số tài khoản *
-            </label>
-            <input
-              type="text"
-              placeholder="Ví dụ: 0123456789"
-              value={accountNumber}
-              onChange={(e) => setAccountNumber(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold focus:outline-none focus:border-emerald-500"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-              Tên chủ tài khoản (viết hoa không dấu) *
-            </label>
-            <input
-              type="text"
-              placeholder="Ví dụ: NGUYEN VAN A"
-              value={accountHolder}
-              onChange={(e) => setAccountHolder(e.target.value.toUpperCase())}
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold uppercase focus:outline-none focus:border-emerald-500"
-              required
-            />
-          </div>
-
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 rounded-2xl transition disabled:opacity-50"
-            >
-              {isSubmitting ? 'Đang lưu...' : 'Lưu tài khoản VietQR'}
             </button>
           </div>
         </form>
