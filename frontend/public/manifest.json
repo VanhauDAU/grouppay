@@ -1,12 +1,24 @@
 {
   "name": "Sổ Nợ Nghĩa Tình",
-  "short_name": "Sổ Nợ Nghĩa Tình",
+  "short_name": "Sổ Nợ",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#f43f5e",
   "description": "Sổ Nợ Nghĩa Tình - Quản lý chi tiêu và công nợ nhóm minh bạch, chính xác",
   "icons": [
+    {
+      "src": "/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-touch-icon-180x180.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
     {
       "src": "/icons/icon-192.png",
       "sizes": "192x192",

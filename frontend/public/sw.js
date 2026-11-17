@@ -1,5 +1,5 @@
 // Service Worker for Sổ Nợ Nghĩa Tình PWA & Web Push Notifications on iPhone / Android / Desktop
-const CACHE_NAME = 'sononghiatinh-cache-v2';
+const CACHE_NAME = 'sononghiatinh-cache-v3';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
