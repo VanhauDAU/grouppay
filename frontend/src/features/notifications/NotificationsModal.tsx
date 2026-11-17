@@ -65,7 +65,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
 
     if (result === 'granted') {
       toast.success('Đã kích hoạt thông báo trên thiết bị thành công!');
-      showWebNotification('🎉 GroupPay', {
+      showWebNotification('🎉 Sổ Nợ Nghĩa Tình', {
         body: 'Bạn sẽ nhận được thông báo khi có người thêm chi tiêu hoặc báo trả tiền!'
       });
     } else if (result === 'denied') {
@@ -74,7 +74,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
   };
 
   const handleSendTestNotification = () => {
-    showWebNotification('🔔 GroupPay Thử Nghiệm', {
+    showWebNotification('🔔 Sổ Nợ Nghĩa Tình Thử Nghiệm', {
       body: 'Thông báo trên thiết bị hoạt động rất tốt! Sẵn sàng cho nhóm.'
     });
     toast.success('Đã gửi thông báo thử nghiệm đến thiết bị của bạn');

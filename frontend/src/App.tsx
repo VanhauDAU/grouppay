@@ -170,17 +170,17 @@ export function App() {
       fetchAllData();
       if (event.eventType === 'payment.created') {
         toast.info('Có yêu cầu xác nhận chuyển khoản mới!');
-        showWebNotification('GroupPay: Yêu Cầu Xác Nhận', {
+        showWebNotification('Sổ Nợ Nghĩa Tình: Yêu Cầu Xác Nhận', {
           body: 'Có thành viên vừa báo đã trả tiền, hãy mở ứng dụng để xác nhận!'
         });
       } else if (event.eventType === 'payment.confirmed') {
         toast.success('Khoản chuyển tiền đã được xác nhận!');
-        showWebNotification('GroupPay: Đã Nhận Tiền', {
+        showWebNotification('Sổ Nợ Nghĩa Tình: Đã Nhận Tiền', {
           body: 'Khoản chuyển tiền đã được người nhận xác nhận thành công!'
         });
       } else if (event.eventType === 'activity.created') {
         toast.info('Vừa có hoạt động chi tiêu mới được thêm!');
-        showWebNotification('GroupPay: Chi Tiêu Mới', {
+        showWebNotification('Sổ Nợ Nghĩa Tình: Chi Tiêu Mới', {
           body: 'Vừa có hoạt động chi tiêu mới được thêm vào nhóm của bạn!'
         });
       }

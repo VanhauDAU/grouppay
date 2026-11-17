@@ -112,9 +112,9 @@ export async function showWebNotification(
 
   const notificationOptions = {
     body: options?.body || '',
-    icon: '/vite.svg',
-    badge: '/vite.svg',
-    tag: options?.tag || 'grouppay-alert',
+    icon: '/icons/icon-192.png',
+    badge: '/favicon.png',
+    tag: options?.tag || 'sononghiatinh-alert',
     data: options?.url || window.location.href
   };
 

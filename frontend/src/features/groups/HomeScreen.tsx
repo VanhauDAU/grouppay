@@ -111,12 +111,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectGroup }) => {
     <div className="min-h-screen bg-slate-50 flex flex-col justify-between p-4 sm:p-6 max-w-lg mx-auto">
       {/* Brand Header */}
       <div className="pt-6 sm:pt-10 pb-6 text-center">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-gradient-to-tr from-emerald-600 to-teal-400 text-white shadow-lg shadow-emerald-500/25 mb-4">
-          <Wallet className="w-8 h-8" />
-        </div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Tính Tiền Nhóm</h1>
-        <p className="text-slate-500 text-sm mt-1.5 max-w-sm mx-auto">
-          Quản lý chi tiêu, chia tiền lẻ chuẩn xác, tạo mã VietQR và theo dõi công nợ hai chiều tức thì.
+        <img
+          src="/icons/icon-192.png"
+          alt="Sổ Nợ Nghĩa Tình"
+          className="w-20 h-20 rounded-3xl shadow-lg shadow-pink-500/20 mx-auto mb-3.5 object-cover"
+        />
+        <h1 className="text-3xl font-black tracking-tight text-slate-900">Sổ Nợ Nghĩa Tình</h1>
+        <p className="text-slate-500 text-sm mt-1 max-w-sm mx-auto">
+          Quản lý chi tiêu, chia tiền lẻ công bằng và theo dõi công nợ nhóm gắn kết, minh bạch.
         </p>
       </div>
 

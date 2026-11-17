@@ -207,7 +207,7 @@ export const ExportDebtImageModal: React.FC<ExportDebtImageModalProps> = ({
             {/* Header Thẻ: Gradient bắt mắt */}
             <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-4 rounded-2xl shadow-xs space-y-1">
               <div className="flex items-center justify-between text-[11px] text-slate-400 uppercase tracking-wider font-bold">
-                <span>GroupPay • Công Nợ</span>
+                <span>Sổ Nợ Nghĩa Tình • Công Nợ</span>
                 <span>{currentDateStr}</span>
               </div>
               <h3 className="text-base font-black tracking-tight text-white line-clamp-1">
