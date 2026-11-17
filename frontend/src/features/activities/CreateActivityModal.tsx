@@ -259,22 +259,29 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Thêm hoạt động chi tiêu" maxWidth="md">
       <form onSubmit={handleCreateActivity} className="space-y-3.5">
-        {/* 1. Ô nhập tiền lớn, phong cách Mobile Banking */}
+        {/* 1. Ô nhập tiền lớn, phong cách Mobile Banking tự động format đơn vị */}
         <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-200/90 text-center">
           <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
             Số tiền chi tiêu (VND) *
           </label>
-          <div className="flex items-center justify-center">
-            <input
-              type="number"
-              inputMode="numeric"
-              placeholder="0"
-              value={expenseAmount}
-              onChange={(e) => setExpenseAmount(e.target.value ? Number(e.target.value) : '')}
-              className="w-full text-center text-3xl font-black text-slate-900 bg-transparent border-none focus:outline-none placeholder-slate-300 tracking-tight"
-              required
-              autoFocus
-            />
+          <div className="flex items-center justify-center my-1">
+            <div className="inline-flex items-baseline space-x-1.5 border-b-2 border-slate-300 focus-within:border-slate-900 pb-1 transition">
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="0"
+                value={expenseAmount ? Number(expenseAmount).toLocaleString('en-US') : ''}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/\D/g, '');
+                  setExpenseAmount(raw ? Math.min(Number(raw), 10000000000) : '');
+                }}
+                className="text-right text-3xl font-black text-slate-900 bg-transparent border-none focus:outline-none placeholder-slate-300 tracking-tight"
+                size={Math.max(2, (expenseAmount ? Number(expenseAmount).toLocaleString('en-US').length : 1))}
+                required
+                autoFocus
+              />
+              <span className="text-2xl font-black text-slate-500 select-none">đ</span>
+            </div>
           </div>
 
           {/* Nút bấm nhanh số tiền phổ biến */}
@@ -486,19 +493,26 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
                     <div className="space-y-1.5 max-h-36 overflow-y-auto">
                       {activeMembers.map((m) => (
                         <div key={m.id} className="flex items-center justify-between text-xs space-x-2">
-                          <span className="font-semibold text-slate-700 truncate w-32">{m.name}</span>
-                          <input
-                            type="number"
-                            placeholder="0"
-                            value={multiplePayers[m.id] ?? ''}
-                            onChange={(e) =>
-                              setMultiplePayers({
-                                ...multiplePayers,
-                                [m.id]: e.target.value ? Number(e.target.value) : ''
-                              })
-                            }
-                            className="w-28 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-right font-bold text-xs"
-                          />
+                          <span className="font-semibold text-slate-700 truncate w-28">{m.name}</span>
+                          <div className="relative w-32">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="0"
+                              value={multiplePayers[m.id] ? Number(multiplePayers[m.id]).toLocaleString('en-US') : ''}
+                              onChange={(e) => {
+                                const raw = e.target.value.replace(/\D/g, '');
+                                setMultiplePayers({
+                                  ...multiplePayers,
+                                  [m.id]: raw ? Number(raw) : ''
+                                });
+                              }}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-2 pr-5 py-1 text-right font-bold text-xs focus:outline-none focus:border-slate-800"
+                            />
+                            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 pointer-events-none">
+                              đ
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -566,19 +580,26 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
                         if (!m) return null;
                         return (
                           <div key={mId} className="flex items-center justify-between text-xs space-x-2">
-                            <span className="font-semibold text-slate-700 truncate w-32">{m.name}</span>
-                            <input
-                              type="number"
-                              placeholder="0"
-                              value={customSplits[mId] ?? ''}
-                              onChange={(e) =>
-                                setCustomSplits({
-                                  ...customSplits,
-                                  [mId]: e.target.value ? Number(e.target.value) : ''
-                                })
-                              }
-                              className="w-28 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-right font-bold text-xs"
-                            />
+                            <span className="font-semibold text-slate-700 truncate w-28">{m.name}</span>
+                            <div className="relative w-32">
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                placeholder="0"
+                                value={customSplits[mId] ? Number(customSplits[mId]).toLocaleString('en-US') : ''}
+                                onChange={(e) => {
+                                  const raw = e.target.value.replace(/\D/g, '');
+                                  setCustomSplits({
+                                    ...customSplits,
+                                    [mId]: raw ? Number(raw) : ''
+                                  });
+                                }}
+                                className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-2 pr-5 py-1 text-right font-bold text-xs focus:outline-none focus:border-slate-800"
+                              />
+                              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400 pointer-events-none">
+                                đ
+                              </span>
+                            </div>
                           </div>
                         );
                       })}

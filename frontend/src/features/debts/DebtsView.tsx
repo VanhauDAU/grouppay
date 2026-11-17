@@ -315,14 +315,23 @@ export const DebtsView: React.FC<DebtsViewProps> = ({
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
               Số tiền nợ (VND) *
             </label>
-            <input
-              type="number"
-              placeholder="Ví dụ: 150000"
-              value={initialAmount}
-              onChange={(e) => setInitialAmount(e.target.value ? Number(e.target.value) : '')}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-bold focus:outline-none focus:border-emerald-500"
-              required
-            />
+            <div className="relative">
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="0"
+                value={initialAmount ? Number(initialAmount).toLocaleString('en-US') : ''}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/\D/g, '');
+                  setInitialAmount(raw ? Math.min(Number(raw), 10000000000) : '');
+                }}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 pr-8 py-2.5 text-sm font-bold focus:outline-none focus:border-emerald-500"
+                required
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400 pointer-events-none select-none">
+                đ
+              </span>
+            </div>
           </div>
 
           <div>

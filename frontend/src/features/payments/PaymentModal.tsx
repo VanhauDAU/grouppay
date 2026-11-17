@@ -133,26 +133,27 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           </div>
         </div>
 
-        {/* Ô nhập số tiền lớn */}
+        {/* Ô nhập số tiền lớn tự động định dạng */}
         <div>
           <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
-            Số tiền đã trả (đ) *
+            Số tiền đã trả (VND) *
           </label>
           <div className="relative">
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               placeholder="0"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value ? Number(e.target.value) : '')}
-              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3.5 text-2xl font-black text-slate-900 focus:outline-none focus:border-emerald-500 transition tracking-tight"
+              value={amount ? Number(amount).toLocaleString('en-US') : ''}
+              onChange={(e) => {
+                const raw = e.target.value.replace(/\D/g, '');
+                setAmount(raw ? Math.min(Number(raw), 10000000000) : '');
+              }}
+              className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 pr-12 py-3.5 text-2xl font-black text-slate-900 focus:outline-none focus:border-emerald-500 transition tracking-tight"
               required
-              min={1}
             />
-            {amount && Number(amount) > 0 ? (
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
-                {formatVND(Number(amount))}
-              </div>
-            ) : null}
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-lg font-black text-slate-400 pointer-events-none select-none">
+              đ
+            </span>
           </div>
 
           {/* Phím tắt chọn nhanh */}
