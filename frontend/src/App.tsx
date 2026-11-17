@@ -8,7 +8,6 @@ import {
   History,
   Bell,
   Share2,
-  FileSpreadsheet,
   Plus,
   Wifi,
   WifiOff,
@@ -28,7 +27,6 @@ import { DebtsView } from './features/debts/DebtsView.js';
 import { PaymentsView } from './features/payments/PaymentsView.js';
 import { MembersView } from './features/members/MembersView.js';
 import { HistoryView } from './features/history/HistoryView.js';
-import { ExportModal } from './features/export/ExportModal.js';
 import { ExportDebtImageModal } from './features/debts/ExportDebtImageModal.js';
 import { NotificationsModal } from './features/notifications/NotificationsModal.js';
 import { PaymentModal } from './features/payments/PaymentModal.js';
@@ -81,7 +79,6 @@ export function App() {
   const [isCreateActivityOpen, setIsCreateActivityOpen] = useState(false);
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [bankConfigMember, setBankConfigMember] = useState<any | null>(null);
-  const [isExportOpen, setIsExportOpen] = useState(false);
   const [isExportDebtImageOpen, setIsExportDebtImageOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
@@ -108,8 +105,13 @@ export function App() {
       if (gRes.success && gRes.data) setGroupInfo(gRes.data);
       if (mRes.success && mRes.data) {
         setMembers(mRes.data);
-        // Nếu chưa chọn member hoặc member không thuộc nhóm nữa, mở modal chọn
-        if (!currentMember || !mRes.data.some((m: any) => m.id === currentMember.id)) {
+        if (currentMember) {
+          const fresh = mRes.data.find((m: any) => m.id === currentMember.id);
+          if (fresh && (fresh.avatarUrl !== currentMember.avatarUrl || fresh.name !== currentMember.name)) {
+            setCurrentMember(fresh);
+            localStorage.setItem('tinhtien_current_member', JSON.stringify(fresh));
+          }
+        } else {
           setIsSelectMemberOpen(true);
         }
       }
@@ -303,15 +305,6 @@ export function App() {
               {unreadCount > 0 && (
                 <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full" />
               )}
-            </button>
-
-            {/* Share / Export */}
-            <button
-              onClick={() => setIsExportOpen(true)}
-              className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition active:scale-95"
-              title="Xuất Excel / PDF / Ảnh Mess"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -532,13 +525,6 @@ export function App() {
         groupCode={currentGroupCode}
         member={bankConfigMember}
         onSuccess={fetchAllData}
-      />
-
-      <ExportModal
-        isOpen={isExportOpen}
-        onClose={() => setIsExportOpen(false)}
-        groupCode={currentGroupCode}
-        onOpenExportImage={() => setIsExportDebtImageOpen(true)}
       />
 
       <ExportDebtImageModal

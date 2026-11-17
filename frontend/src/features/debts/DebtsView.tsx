@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ArrowRight, Send, Plus, FileText, CheckCircle2, History, Receipt, Image as ImageIcon } from 'lucide-react';
 import { formatVND, getInitials, formatDateTime } from '../../utils/format.js';
 import { getMemberTheme } from '../../utils/theme.js';
+import { Avatar } from '../../components/common/Avatar.js';
 import { Modal } from '../../components/common/Modal.js';
 import { PairwiseDebtDetailModal } from './PairwiseDebtDetailModal.js';
 import { ExportDebtImageModal } from './ExportDebtImageModal.js';
@@ -12,6 +13,7 @@ interface Member {
   id: string;
   name: string;
   status: string;
+  avatarUrl?: string | null;
 }
 
 interface DebtsViewProps {
@@ -144,6 +146,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({
               const debtorName = item.netDebtorId === item.memberAId ? item.memberAName : item.memberBName;
               const creditorName = item.netCreditorId === item.memberAId ? item.memberAName : item.memberBName;
               const isMeDebtor = currentMemberId === item.netDebtorId;
+              const debtorMember = members.find((m) => m.id === item.netDebtorId || m.name === debtorName);
 
               return (
                 <div
@@ -156,12 +159,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       {/* Avatar debtor */}
-                      <div
-                        className="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs text-white"
-                        style={{ backgroundColor: getMemberTheme({ name: debtorName }).hex }}
-                      >
-                        {getInitials(debtorName)}
-                      </div>
+                      <Avatar name={debtorName} avatarUrl={debtorMember?.avatarUrl} size="sm" />
 
                       <div className="text-xs">
                         <div className="flex items-center space-x-1.5 font-bold text-slate-800">
@@ -358,6 +356,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({
         onClose={() => setSelectedPair(null)}
         pair={selectedPair}
         obligations={obligations}
+        members={members}
         currentMemberId={currentMemberId}
         onOpenPaymentModal={onOpenPaymentModal}
       />

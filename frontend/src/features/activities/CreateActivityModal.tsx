@@ -16,6 +16,7 @@ import { api } from '../../services/api.js';
 import { toast } from 'sonner';
 import { formatVND, getInitials } from '../../utils/format.js';
 import { getMemberTheme } from '../../utils/theme.js';
+import { Avatar } from '../../components/common/Avatar.js';
 
 interface Member {
   id: string;
@@ -402,12 +403,7 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
                       : 'bg-white text-slate-500 border border-slate-200/80 hover:bg-slate-100'
                   }`}
                 >
-                  <div
-                    className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold"
-                    style={{ backgroundColor: isChecked ? 'rgba(255,255,255,0.2)' : mTheme.hex, color: '#fff' }}
-                  >
-                    {getInitials(m.name)}
-                  </div>
+                  <Avatar name={m.name} avatarUrl={m.avatarUrl} size="xs" />
                   <span>{m.name}</span>
                   {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
                 </button>

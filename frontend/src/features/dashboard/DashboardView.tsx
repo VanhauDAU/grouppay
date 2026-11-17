@@ -268,7 +268,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center justify-between"
               >
                 <div className="flex items-center space-x-3">
-                  <Avatar name={item.creditorName} size="sm" />
+                  <Avatar name={item.creditorName} avatarUrl={item.avatarUrl} size="sm" />
                   <div>
                     <div className="font-bold text-slate-800 text-xs">{item.creditorName}</div>
                     <div className="text-xs font-extrabold text-rose-500">Cần trả: {formatVND(item.amount)}</div>
@@ -318,7 +318,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center justify-between"
               >
                 <div className="flex items-center space-x-3">
-                  <Avatar name={item.debtorName} size="sm" />
+                  <Avatar name={item.debtorName} avatarUrl={item.avatarUrl} size="sm" />
                   <div>
                     <div className="font-bold text-slate-800 text-xs">{item.debtorName}</div>
                     <div className="text-[11px] text-slate-400">cần chuyển lại cho bạn</div>
@@ -448,7 +448,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {netBalances?.map((m: any) => (
             <div key={m.memberId} className="flex items-center justify-between text-xs py-1">
               <div className="flex items-center space-x-2.5">
-                <Avatar name={m.memberName} size="xs" />
+                <Avatar name={m.memberName} avatarUrl={m.avatarUrl} size="xs" />
                 <span className="font-semibold text-slate-700">{m.memberName}</span>
               </div>
 

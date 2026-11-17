@@ -125,6 +125,7 @@ dashboardRouter.get('/:groupCode/dashboard', requireGroup, async (c) => {
         return {
           creditorId: p.netCreditorId,
           creditorName: p.netCreditorId === p.memberAId ? p.memberAName : p.memberBName,
+          avatarUrl: creditorMember?.avatar_url || null,
           amount: p.netAmount,
           bankAccount: creditorMember?.account_number
             ? {
@@ -141,18 +142,25 @@ dashboardRouter.get('/:groupCode/dashboard', requireGroup, async (c) => {
 
     const peopleOweMe = pairwiseDebts
       .filter((p) => p.netCreditorId === currentMember.id)
-      .map((p) => ({
-        debtorId: p.netDebtorId,
-        debtorName: p.netDebtorId === p.memberAId ? p.memberAName : p.memberBName,
-        amount: p.netAmount
-      }));
+      .map((p) => {
+        const debtorMember = members.find((m) => m.id === p.netDebtorId);
+        return {
+          debtorId: p.netDebtorId,
+          debtorName: p.netDebtorId === p.memberAId ? p.memberAName : p.memberBName,
+          avatarUrl: debtorMember?.avatar_url || null,
+          amount: p.netAmount
+        };
+      });
 
     const myPendingReceived = pendingPayments.filter((p) => p.recipient_member_id === currentMember.id);
     const myPendingSent = pendingPayments.filter((p) => p.payer_member_id === currentMember.id);
 
+    const currentMemberRecord = members.find((m) => m.id === currentMember.id);
+
     personal = {
       memberId: currentMember.id,
       memberName: currentMember.name,
+      avatarUrl: currentMemberRecord?.avatar_url || null,
       totalOwedToOthers: myBalance?.totalOwedToOthers || 0,
       totalOwedByOthers: myBalance?.totalOwedByOthers || 0,
       netBalance: myBalance?.netBalance || 0,
@@ -163,6 +171,14 @@ dashboardRouter.get('/:groupCode/dashboard', requireGroup, async (c) => {
     };
   }
 
+  const netBalancesWithAvatar = netBalances.map((b) => {
+    const mem = members.find((m) => m.id === b.memberId);
+    return {
+      ...b,
+      avatarUrl: mem?.avatar_url || null
+    };
+  });
+
   return c.json({
     success: true,
     data: {
@@ -170,10 +186,11 @@ dashboardRouter.get('/:groupCode/dashboard', requireGroup, async (c) => {
         id: group.id,
         name: group.name,
         currency: group.currency,
-        totalExpense
+        totalExpense,
+        memberBalances: netBalancesWithAvatar
       },
       personal,
-      netBalances,
+      netBalances: netBalancesWithAvatar,
       pairwiseDebts,
       settlementProposals,
       pendingPayments,

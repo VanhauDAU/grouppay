@@ -141,10 +141,28 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     }
 
     try {
-      await api.updateMember(groupCode, member.id, { avatarUrl: finalAvatar });
+      const res = await api.updateMember(groupCode, member.id, { avatarUrl: finalAvatar });
+      if (!res.success) {
+        toast.error(res.error || 'Lỗi khi lưu ảnh đại diện');
+        setIsSubmitting(false);
+        return;
+      }
+
       localStorage.setItem(`tinhtien_color_${member.id}`, selectedHex);
       localStorage.setItem('tinhtien_user_theme_hex', selectedHex);
       applyThemeToDocument(selectedHex);
+
+      // Cập nhật ngay localStorage current member nếu là tài khoản của mình
+      const savedStr = localStorage.getItem('tinhtien_current_member');
+      if (savedStr) {
+        try {
+          const current = JSON.parse(savedStr);
+          if (current.id === member.id) {
+            current.avatarUrl = finalAvatar;
+            localStorage.setItem('tinhtien_current_member', JSON.stringify(current));
+          }
+        } catch {}
+      }
 
       toast.success('Cập nhật màu sắc & ảnh đại diện thành công!');
       if (onSuccess) onSuccess();

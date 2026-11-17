@@ -15,12 +15,12 @@ export const UpdateGroupSchema = z.object({
 
 export const CreateMemberSchema = z.object({
   name: z.string().trim().min(1, 'Tên thành viên không được để trống').max(50, 'Tên không quá 50 ký tự'),
-  avatarUrl: z.string().max(255).optional().nullable()
+  avatarUrl: z.string().max(200000, 'Ảnh đại diện quá lớn').optional().nullable()
 });
 
 export const UpdateMemberSchema = z.object({
   name: z.string().trim().min(1).max(50).optional(),
-  avatarUrl: z.string().max(255).optional().nullable(),
+  avatarUrl: z.string().max(200000, 'Ảnh đại diện quá lớn').optional().nullable(),
   status: z.enum(['ACTIVE', 'INACTIVE']).optional()
 });
 

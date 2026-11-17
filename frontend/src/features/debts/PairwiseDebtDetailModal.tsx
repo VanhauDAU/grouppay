@@ -14,6 +14,7 @@ import {
 import { Modal } from '../../components/common/Modal.js';
 import { formatVND, getInitials, formatDateTime } from '../../utils/format.js';
 import { getMemberTheme } from '../../utils/theme.js';
+import { Avatar } from '../../components/common/Avatar.js';
 
 interface ObligationItem {
   id: string;
@@ -48,6 +49,7 @@ interface PairwiseDebtDetailModalProps {
   onClose: () => void;
   pair: PairwiseItem | null;
   obligations: ObligationItem[];
+  members?: { id: string; name: string; avatarUrl?: string | null }[];
   currentMemberId?: string | null;
   onOpenPaymentModal?: (recipientId?: string, defaultAmount?: number) => void;
 }
@@ -57,6 +59,7 @@ export const PairwiseDebtDetailModal: React.FC<PairwiseDebtDetailModalProps> = (
   onClose,
   pair,
   obligations,
+  members,
   currentMemberId,
   onOpenPaymentModal
 }) => {
@@ -65,6 +68,9 @@ export const PairwiseDebtDetailModal: React.FC<PairwiseDebtDetailModalProps> = (
   if (!pair) return null;
 
   const { memberAId, memberAName, memberBId, memberBName, aOwesB, bOwesA, netDebtorId, netCreditorId, netAmount } = pair;
+
+  const memberA = members?.find((m) => m.id === memberAId);
+  const memberB = members?.find((m) => m.id === memberBId);
 
   // Lọc các nghĩa vụ giữa A và B
   // A nợ B
@@ -90,12 +96,7 @@ export const PairwiseDebtDetailModal: React.FC<PairwiseDebtDetailModalProps> = (
         <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2.5">
-              <div
-                className="w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs text-white shadow-2xs"
-                style={{ backgroundColor: themeA.hex }}
-              >
-                {getInitials(memberAName)}
-              </div>
+              <Avatar name={memberAName} avatarUrl={memberA?.avatarUrl} size="md" />
               <div>
                 <span className="text-xs font-bold text-slate-800 block">{memberAName}</span>
                 <span className="text-[10px] text-slate-400">
@@ -118,12 +119,7 @@ export const PairwiseDebtDetailModal: React.FC<PairwiseDebtDetailModalProps> = (
                   {memberBId === currentMemberId ? '(Bạn)' : 'Thành viên'}
                 </span>
               </div>
-              <div
-                className="w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-xs text-white shadow-2xs"
-                style={{ backgroundColor: themeB.hex }}
-              >
-                {getInitials(memberBName)}
-              </div>
+              <Avatar name={memberBName} avatarUrl={memberB?.avatarUrl} size="md" />
             </div>
           </div>
 
