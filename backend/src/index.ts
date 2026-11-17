@@ -30,6 +30,13 @@ app.use(
 app.get('/', (c) => c.json({ name: 'TinhTien API', status: 'online', time: new Date().toISOString() }));
 app.get('/api/health', (c) => c.json({ status: 'ok' }));
 
+// Manual DB Schema Initialization trigger
+app.get('/api/init-db', async (c) => {
+  const { ensureSchema } = await import('./db/db.js');
+  await ensureSchema(c.env.DB);
+  return c.json({ success: true, message: 'Database schema successfully initialized or already up to date!' });
+});
+
 // WebSocket upgrade endpoint chuyển tiếp đến Durable Object của nhóm
 app.get('/api/groups/:groupCode/ws', async (c) => {
   const groupCode = c.req.param('groupCode');
