@@ -188,7 +188,10 @@ export function App() {
     [fetchAllData]
   );
 
-  const { isConnected } = useRealtime(currentGroupCode, currentMember?.id || null, handleRealtimeEvent);
+  const { isConnected } = useRealtime(currentGroupCode, currentMember?.id || null, {
+    onEvent: handleRealtimeEvent,
+    onWakeup: fetchAllData
+  });
 
   const handleSelectGroup = (code: string) => {
     setCurrentGroupCode(code);

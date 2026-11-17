@@ -21,13 +21,40 @@ export async function broadcastGroupEvent(
   };
 
   try {
+    // 1. Luôn broadcast tới room bằng groupId (UUID nội bộ)
     const doId = env.GROUP_ROOM.idFromName(groupId);
     const roomStub = env.GROUP_ROOM.get(doId);
-    await roomStub.fetch('http://internal/broadcast', {
+    const p1 = roomStub.fetch('http://internal/broadcast', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(event)
     });
+
+    // 2. Broadcast đồng thời tới cả room bằng public_code nếu có DB
+    // Đảm bảo client kết nối bằng public_code hay groupId đều nhận tức thì!
+    let p2: Promise<any> | null = null;
+    if (env.DB) {
+      try {
+        const db = getDb(env);
+        const group = await db.queryFirst<{ id: string; public_code: string }>(
+          'SELECT id, public_code FROM groups WHERE id = ? OR public_code = ? LIMIT 1',
+          [groupId, groupId]
+        );
+        if (group?.public_code && group.public_code !== groupId) {
+          const doIdCode = env.GROUP_ROOM.idFromName(group.public_code);
+          const roomStubCode = env.GROUP_ROOM.get(doIdCode);
+          p2 = roomStubCode.fetch('http://internal/broadcast', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(event)
+          });
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    await Promise.allSettled([p1, p2].filter(Boolean) as Promise<any>[]);
   } catch (err) {
     // Durable Object broadcast lỗi không chặn luồng chính
     console.error('Failed to broadcast DO event:', err);

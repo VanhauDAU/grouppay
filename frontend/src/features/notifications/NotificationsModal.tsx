@@ -94,78 +94,63 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Thông báo nhóm" maxWidth="md">
       <div className="space-y-4">
-        {/* Banner cấu hình thông báo trên thiết bị / iPhone */}
-        <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-4 rounded-2xl shadow-sm space-y-3">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center space-x-2.5">
-              <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0">
-                <Smartphone className="w-5 h-5 text-emerald-400" />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-white flex items-center space-x-1.5">
-                  <span>Thông báo Web App (iPhone & Android)</span>
-                  {permission === 'granted' && (
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  )}
-                </h4>
-                <p className="text-[11px] text-slate-300">
-                  Hiển thị banner thông báo ngay trên màn hình khóa điện thoại
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Trạng thái quyền */}
-          {permission === 'granted' ? (
-            <div className="flex items-center justify-between pt-1 border-t border-white/10 text-xs">
-              <span className="text-emerald-400 flex items-center space-x-1 font-bold text-[11px]">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Đã bật thông báo thiết bị</span>
-              </span>
-              <button
-                type="button"
-                onClick={handleSendTestNotification}
-                className="bg-white/15 hover:bg-white/25 text-white text-[11px] font-bold px-2.5 py-1 rounded-lg transition active:scale-95"
-              >
-                Gửi thử
-              </button>
-            </div>
-          ) : permission === 'denied' ? (
-            <div className="text-[11px] text-rose-300 bg-rose-500/20 p-2.5 rounded-xl border border-rose-500/30 flex items-center space-x-2">
-              <AlertTriangle className="w-4 h-4 flex-shrink-0 text-rose-400" />
-              <span>
-                Quyền thông báo đang bị tắt. Vui lòng vào Cài đặt trình duyệt để cho phép.
-              </span>
-            </div>
-          ) : (
-            <div className="space-y-2 pt-1 border-t border-white/10">
-              <button
-                type="button"
-                onClick={handleRequestPermission}
-                disabled={isRequesting}
-                className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-extrabold py-2 px-3 rounded-xl text-xs flex items-center justify-center space-x-1.5 shadow-sm transition active:scale-95 disabled:opacity-50"
-              >
-                <BellRing className="w-4 h-4" />
-                <span>{isRequesting ? 'Đang kích hoạt...' : 'Bật thông báo trên thiết bị'}</span>
-              </button>
-
-              {/* Hướng dẫn riêng cho iPhone */}
-              {iosDevice && !standalone && (
-                <div className="bg-white/10 p-2.5 rounded-xl text-[11px] text-slate-300 space-y-1">
-                  <div className="font-bold text-amber-300 flex items-center space-x-1">
-                    <Info className="w-3.5 h-3.5" />
-                    <span>Lưu ý đặc biệt cho iPhone (iOS 16.4+):</span>
-                  </div>
-                  <p className="leading-relaxed text-slate-200">
-                    Để nhận thông báo đẩy khi màn hình tắt: Trong Safari, bấm nút{' '}
-                    <b>Chia sẻ (biểu tượng ô vuông mũi tên ⎋)</b> ➔ Chọn{' '}
-                    <b>"Thêm vào MH chính" (Add to Home Screen)</b>.
+        {/* Banner cấu hình thông báo trên thiết bị / iPhone - tự động ẩn khi đã bật để giao diện gọn gàng */}
+        {permission !== 'granted' && (
+          <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-4 rounded-2xl shadow-sm space-y-3">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center space-x-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center flex-shrink-0">
+                  <Smartphone className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-white flex items-center space-x-1.5">
+                    <span>Thông báo Web App (iPhone & Android)</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-300">
+                    Hiển thị thông báo ngay khi có chi tiêu hoặc xác nhận tiền
                   </p>
                 </div>
-              )}
+              </div>
             </div>
-          )}
-        </div>
+
+            {/* Trạng thái quyền */}
+            {permission === 'denied' ? (
+              <div className="text-[11px] text-rose-300 bg-rose-500/20 p-2.5 rounded-xl border border-rose-500/30 flex items-center space-x-2">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0 text-rose-400" />
+                <span>
+                  Quyền thông báo đang bị tắt. Vui lòng vào Cài đặt trình duyệt để cho phép.
+                </span>
+              </div>
+            ) : (
+              <div className="space-y-2 pt-1 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={handleRequestPermission}
+                  disabled={isRequesting}
+                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-900 font-extrabold py-2 px-3 rounded-xl text-xs flex items-center justify-center space-x-1.5 shadow-sm transition active:scale-95 disabled:opacity-50"
+                >
+                  <BellRing className="w-4 h-4" />
+                  <span>{isRequesting ? 'Đang kích hoạt...' : 'Bật thông báo trên thiết bị'}</span>
+                </button>
+
+                {/* Hướng dẫn riêng cho iPhone */}
+                {iosDevice && !standalone && (
+                  <div className="bg-white/10 p-2.5 rounded-xl text-[11px] text-slate-300 space-y-1">
+                    <div className="font-bold text-amber-300 flex items-center space-x-1">
+                      <Info className="w-3.5 h-3.5" />
+                      <span>Lưu ý cho iPhone (iOS 16.4+):</span>
+                    </div>
+                    <p className="leading-relaxed text-slate-200">
+                      Để nhận thông báo khi màn hình tắt: Trong Safari, bấm nút{' '}
+                      <b>Chia sẻ (⎋)</b> ➔ Chọn{' '}
+                      <b>"Thêm vào MH chính" (Add to Home Screen)</b>.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Danh sách thông báo */}
         <div className="space-y-2.5">

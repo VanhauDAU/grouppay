@@ -1,22 +1,56 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { RealtimeMessage } from '@tinhtien/shared';
 
+export interface UseRealtimeOptions {
+  onEvent?: (event: RealtimeMessage) => void;
+  onWakeup?: () => void;
+}
+
 export function useRealtime(
   groupCode: string | null,
   memberId: string | null,
-  onEvent?: (event: RealtimeMessage) => void
+  options?: UseRealtimeOptions | ((event: RealtimeMessage) => void)
 ) {
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<any>(null);
+  const pingIntervalRef = useRef<any>(null);
+  const fallbackPollRef = useRef<any>(null);
+  const reconnectAttemptsRef = useRef(0);
+
+  // Chuẩn hóa options: hỗ trợ cả function hoặc object config
+  const onEvent = typeof options === 'function' ? options : options?.onEvent;
+  const onWakeup = typeof options === 'object' ? options?.onWakeup : undefined;
+
   const onEventRef = useRef(onEvent);
   onEventRef.current = onEvent;
+
+  const onWakeupRef = useRef(onWakeup);
+  onWakeupRef.current = onWakeup;
+
+  const clearTimers = () => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    if (pingIntervalRef.current) {
+      clearInterval(pingIntervalRef.current);
+      pingIntervalRef.current = null;
+    }
+  };
 
   const connect = useCallback(() => {
     if (!groupCode) return;
 
+    clearTimers();
+
     if (wsRef.current) {
-      wsRef.current.close();
+      try {
+        wsRef.current.close();
+      } catch {
+        // ignore
+      }
+      wsRef.current = null;
     }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -30,11 +64,27 @@ export function useRealtime(
 
       ws.onopen = () => {
         setIsConnected(true);
+        reconnectAttemptsRef.current = 0;
+
+        // Bắt đầu heartbeat ping mỗi 15s để giữ kết nối trên iOS Safari & carrier NAT
+        if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+        pingIntervalRef.current = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            try {
+              ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+            } catch {
+              // ignore
+            }
+          }
+        }, 15000);
       };
 
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          if (data.type === 'pong' || data.type === 'connected') {
+            return;
+          }
           if (data.eventType && onEventRef.current) {
             onEventRef.current(data);
           }
@@ -45,33 +95,101 @@ export function useRealtime(
 
       ws.onclose = () => {
         setIsConnected(false);
-        // Auto reconnect sau 3 giây
+        if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+
+        // Exponential backoff reconnect: 1s, 2s, 3s, tối đa 5s
+        reconnectAttemptsRef.current += 1;
+        const delay = Math.min(reconnectAttemptsRef.current * 1000, 5000);
         reconnectTimeoutRef.current = setTimeout(() => {
           connect();
-        }, 3000);
+        }, delay);
       };
 
       ws.onerror = () => {
         setIsConnected(false);
-        ws.close();
+        try {
+          ws.close();
+        } catch {
+          // ignore
+        }
       };
     } catch {
       setIsConnected(false);
+      reconnectTimeoutRef.current = setTimeout(() => {
+        connect();
+      }, 3000);
     }
   }, [groupCode, memberId]);
+
+  // Listener khi quay lại tab / mở khóa màn hình / online trở lại
+  useEffect(() => {
+    const handleWakeup = () => {
+      if (document.visibilityState === 'visible') {
+        // Tức tốc refresh dữ liệu khi người dùng mở lại điện thoại
+        onWakeupRef.current?.();
+
+        // Nếu socket chưa OPEN, kết nối lại ngay lập tức không cần chờ timer
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+          reconnectAttemptsRef.current = 0;
+          connect();
+        }
+      }
+    };
+
+    const handleOnline = () => {
+      onWakeupRef.current?.();
+      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+        connect();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleWakeup);
+    window.addEventListener('focus', handleWakeup);
+    window.addEventListener('online', handleOnline);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleWakeup);
+      window.removeEventListener('focus', handleWakeup);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [connect]);
+
+  // Fallback Polling an toàn tuyệt đối:
+  // Nếu WebSocket mất kết nối hoặc bị tường lửa chặn, tự động poll mỗi 5s để không bao giờ lỡ dữ liệu
+  // Khi WebSocket đã kết nối tốt, giãn cách poll mỗi 60s
+  useEffect(() => {
+    if (!groupCode) return;
+
+    const intervalTime = isConnected ? 60000 : 5000;
+    fallbackPollRef.current = setInterval(() => {
+      // Chỉ poll khi tab đang hiển thị
+      if (document.visibilityState === 'visible') {
+        onWakeupRef.current?.();
+      }
+    }, intervalTime);
+
+    return () => {
+      if (fallbackPollRef.current) {
+        clearInterval(fallbackPollRef.current);
+      }
+    };
+  }, [groupCode, isConnected]);
 
   useEffect(() => {
     connect();
 
     return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
+      clearTimers();
+      if (fallbackPollRef.current) clearInterval(fallbackPollRef.current);
       if (wsRef.current) {
-        wsRef.current.close();
+        try {
+          wsRef.current.close();
+        } catch {
+          // ignore
+        }
       }
     };
   }, [connect]);
 
-  return { isConnected };
+  return { isConnected, reconnect: connect };
 }

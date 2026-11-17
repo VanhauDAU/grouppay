@@ -42,8 +42,23 @@ app.get('/api/groups/:groupCode/ws', async (c) => {
   const groupCode = c.req.param('groupCode');
   const memberId = c.req.query('memberId') || 'anonymous';
 
-  // Lấy GroupRoom Durable Object tương ứng với group
-  const doId = c.env.GROUP_ROOM.idFromName(groupCode);
+  // Lấy GroupRoom Durable Object tương ứng: ưu tiên ID chuẩn từ DB
+  let roomId = groupCode;
+  try {
+    const { getDb } = await import('./db/db.js');
+    const db = getDb(c.env);
+    const group = await db.queryFirst<{ id: string; public_code: string }>(
+      'SELECT id, public_code FROM groups WHERE public_code = ? OR id = ? LIMIT 1',
+      [groupCode, groupCode]
+    );
+    if (group?.id) {
+      roomId = group.id;
+    }
+  } catch {
+    // fallback roomId = groupCode
+  }
+
+  const doId = c.env.GROUP_ROOM.idFromName(roomId);
   const roomStub = c.env.GROUP_ROOM.get(doId);
 
   const forwardUrl = new URL(c.req.url);
