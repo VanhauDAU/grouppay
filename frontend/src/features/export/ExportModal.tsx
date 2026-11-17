@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
-import { FileSpreadsheet, Printer, Download } from 'lucide-react';
+import { FileSpreadsheet, Printer, Download, Image as ImageIcon } from 'lucide-react';
 import { Modal } from '../../components/common/Modal.js';
 import { api } from '../../services/api.js';
 import { formatVND, formatDateTime } from '../../utils/format.js';
@@ -10,9 +10,15 @@ interface ExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   groupCode: string;
+  onOpenExportImage?: () => void;
 }
 
-export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, groupCode }) => {
+export const ExportModal: React.FC<ExportModalProps> = ({
+  isOpen,
+  onClose,
+  groupCode,
+  onOpenExportImage
+}) => {
   const [isExporting, setIsExporting] = useState(false);
 
   const handleExportExcel = async () => {
@@ -124,12 +130,32 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, group
         </p>
 
         <div className="grid grid-cols-2 gap-3">
+          {onOpenExportImage && (
+            <button
+              onClick={() => {
+                onClose();
+                onOpenExportImage();
+              }}
+              className="p-4 rounded-2xl border border-sky-200 bg-sky-50/70 hover:bg-sky-50 text-left transition active:scale-95 flex items-center space-x-3 col-span-2 shadow-2xs"
+            >
+              <div className="w-10 h-10 rounded-xl bg-sky-600 text-white flex items-center justify-center flex-shrink-0 shadow-2xs">
+                <ImageIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="font-bold text-slate-900 text-sm">Xuất ảnh tóm tắt gửi Messenger / Zalo</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">
+                  Tối giản, chỉ hiển thị ai chuyển cho ai bao nhiêu tiền để gửi vào chat nhóm
+                </div>
+              </div>
+            </button>
+          )}
+
           <button
             onClick={handleExportExcel}
             disabled={isExporting}
-            className="p-5 rounded-2xl border border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50 text-left transition active:scale-95 flex flex-col justify-between space-y-3"
+            className="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50 text-left transition active:scale-95 flex flex-col justify-between space-y-3"
           >
-            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-2xs">
               <FileSpreadsheet className="w-5 h-5" />
             </div>
             <div>
@@ -140,9 +166,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, group
 
           <button
             onClick={handlePrint}
-            className="p-5 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-left transition active:scale-95 flex flex-col justify-between space-y-3"
+            className="p-4 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-left transition active:scale-95 flex flex-col justify-between space-y-3"
           >
-            <div className="w-10 h-10 rounded-xl bg-slate-800 text-white flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-slate-800 text-white flex items-center justify-center shadow-2xs">
               <Printer className="w-5 h-5" />
             </div>
             <div>

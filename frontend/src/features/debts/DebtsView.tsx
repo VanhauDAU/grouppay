@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { ArrowRight, Send, Plus, FileText, CheckCircle2, History, Receipt } from 'lucide-react';
+import { ArrowRight, Send, Plus, FileText, CheckCircle2, History, Receipt, Image as ImageIcon } from 'lucide-react';
 import { formatVND, getInitials, formatDateTime } from '../../utils/format.js';
 import { getMemberTheme } from '../../utils/theme.js';
 import { Modal } from '../../components/common/Modal.js';
 import { PairwiseDebtDetailModal } from './PairwiseDebtDetailModal.js';
+import { ExportDebtImageModal } from './ExportDebtImageModal.js';
 import { api } from '../../services/api.js';
 import { toast } from 'sonner';
 
@@ -15,23 +16,28 @@ interface Member {
 
 interface DebtsViewProps {
   groupCode: string;
+  groupName?: string;
   currentMemberId?: string | null;
   members: Member[];
   debtsData: any;
+  dashboardData?: any;
   onRefresh: () => void;
   onOpenPaymentModal: (recipientId?: string, defaultAmount?: number) => void;
 }
 
 export const DebtsView: React.FC<DebtsViewProps> = ({
   groupCode,
+  groupName,
   currentMemberId,
   members,
   debtsData,
+  dashboardData,
   onRefresh,
   onOpenPaymentModal
 }) => {
   const [activeTab, setActiveTab] = useState<'PAIRWISE' | 'OBLIGATIONS'>('PAIRWISE');
   const [isInitialDebtModalOpen, setIsInitialDebtModalOpen] = useState(false);
+  const [isExportImageOpen, setIsExportImageOpen] = useState(false);
   const [selectedPair, setSelectedPair] = useState<any | null>(null);
 
   // Form nhập nợ ban đầu
@@ -104,13 +110,24 @@ export const DebtsView: React.FC<DebtsViewProps> = ({
           </button>
         </div>
 
-        <button
-          onClick={() => setIsInitialDebtModalOpen(true)}
-          className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-3 py-2 rounded-xl flex items-center space-x-1.5 transition active:scale-95"
-        >
-          <Plus className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Nhập nợ cũ</span>
-        </button>
+        <div className="flex items-center space-x-1.5">
+          <button
+            onClick={() => setIsExportImageOpen(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-2.5 sm:px-3 py-1.5 rounded-xl flex items-center space-x-1 transition active:scale-95 shadow-xs"
+            title="Xuất ảnh công nợ gửi vào Messenger / Zalo"
+          >
+            <ImageIcon className="w-3.5 h-3.5" />
+            <span>Xuất ảnh Mess</span>
+          </button>
+
+          <button
+            onClick={() => setIsInitialDebtModalOpen(true)}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-2.5 py-1.5 rounded-xl flex items-center space-x-1 transition active:scale-95"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Nợ cũ</span>
+          </button>
+        </div>
       </div>
 
       {/* Tab 1: Công nợ hai chiều & Số dư ròng đối chiếu */}
@@ -343,6 +360,17 @@ export const DebtsView: React.FC<DebtsViewProps> = ({
         obligations={obligations}
         currentMemberId={currentMemberId}
         onOpenPaymentModal={onOpenPaymentModal}
+      />
+
+      {/* Modal Xuất ảnh công nợ gửi Messenger */}
+      <ExportDebtImageModal
+        isOpen={isExportImageOpen}
+        onClose={() => setIsExportImageOpen(false)}
+        groupName={groupName || 'Nhóm của bạn'}
+        groupCode={groupCode}
+        members={members}
+        debtsData={debtsData}
+        dashboardData={dashboardData}
       />
     </div>
   );

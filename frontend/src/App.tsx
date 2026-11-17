@@ -29,6 +29,7 @@ import { PaymentsView } from './features/payments/PaymentsView.js';
 import { MembersView } from './features/members/MembersView.js';
 import { HistoryView } from './features/history/HistoryView.js';
 import { ExportModal } from './features/export/ExportModal.js';
+import { ExportDebtImageModal } from './features/debts/ExportDebtImageModal.js';
 import { NotificationsModal } from './features/notifications/NotificationsModal.js';
 import { PaymentModal } from './features/payments/PaymentModal.js';
 import { CreateActivityModal } from './features/activities/CreateActivityModal.js';
@@ -37,6 +38,7 @@ import { EditProfileModal } from './features/members/EditProfileModal.js';
 import { getThemeFromHex, applyThemeToDocument, DEFAULT_HEX } from './utils/theme.js';
 import { Avatar } from './components/common/Avatar.js';
 import { getInitials, getAvatarColor } from './utils/format.js';
+import { initServiceWorker, showWebNotification } from './utils/webNotification.js';
 
 type TabType = 'DASHBOARD' | 'ACTIVITIES' | 'DEBTS' | 'PAYMENTS' | 'MEMBERS' | 'HISTORY';
 
@@ -80,6 +82,7 @@ export function App() {
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [bankConfigMember, setBankConfigMember] = useState<any | null>(null);
   const [isExportOpen, setIsExportOpen] = useState(false);
+  const [isExportDebtImageOpen, setIsExportDebtImageOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [profileTargetMember, setProfileTargetMember] = useState<any | null>(null);
@@ -153,6 +156,11 @@ export function App() {
     }
   }, [currentGroupCode, activeTab]);
 
+  // Đăng ký Service Worker cho thông báo thiết bị / iPhone
+  useEffect(() => {
+    initServiceWorker();
+  }, []);
+
   // Realtime hook
   const handleRealtimeEvent = useCallback(
     (event: any) => {
@@ -160,10 +168,19 @@ export function App() {
       fetchAllData();
       if (event.eventType === 'payment.created') {
         toast.info('Có yêu cầu xác nhận chuyển khoản mới!');
+        showWebNotification('GroupPay: Yêu Cầu Xác Nhận', {
+          body: 'Có thành viên vừa báo đã trả tiền, hãy mở ứng dụng để xác nhận!'
+        });
       } else if (event.eventType === 'payment.confirmed') {
         toast.success('Khoản chuyển tiền đã được xác nhận!');
+        showWebNotification('GroupPay: Đã Nhận Tiền', {
+          body: 'Khoản chuyển tiền đã được người nhận xác nhận thành công!'
+        });
       } else if (event.eventType === 'activity.created') {
         toast.info('Vừa có hoạt động chi tiêu mới được thêm!');
+        showWebNotification('GroupPay: Chi Tiêu Mới', {
+          body: 'Vừa có hoạt động chi tiêu mới được thêm vào nhóm của bạn!'
+        });
       }
     },
     [fetchAllData]
@@ -218,26 +235,26 @@ export function App() {
     <div className="min-h-screen bg-slate-50 flex flex-col justify-between">
       <Toaster position="top-center" richColors />
 
-      {/* Top Header Navbar */}
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-4 py-3">
+      {/* Top Header Navbar - Gọn gàng & Tối ưu Mobile */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-3 sm:px-4 py-2">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-2.5">
+          <div className="flex items-center space-x-2 min-w-0">
             <button
               onClick={handleBackToHome}
-              className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition"
+              className="p-1.5 -ml-1 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition flex-shrink-0"
               title="Về danh sách nhóm"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-4 h-4" />
             </button>
 
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center space-x-1.5">
-                <h2 className="text-base font-extrabold text-slate-900 tracking-tight">
+                <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight truncate max-w-[120px] sm:max-w-[220px]">
                   {groupInfo?.name || 'Nhóm của bạn'}
                 </h2>
                 {/* Live connection status dot */}
                 <span
-                  className={`w-2 h-2 rounded-full ${
+                  className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                     isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'
                   }`}
                   title={isConnected ? 'Đang kết nối Realtime' : 'Mất kết nối'}
@@ -245,23 +262,23 @@ export function App() {
               </div>
               <button
                 onClick={handleShareLink}
-                className="text-[11px] text-slate-500 hover:text-emerald-600 flex items-center space-x-1 transition"
+                className="text-[10px] text-slate-500 hover:text-emerald-600 flex items-center space-x-1 transition"
               >
                 <span>Mã: {currentGroupCode}</span>
-                <Copy className="w-3 h-3" />
+                <Copy className="w-2.5 h-2.5" />
               </button>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1 sm:space-x-1.5 flex-shrink-0">
             {/* Member selector pill */}
             <button
               onClick={() => setIsSelectMemberOpen(true)}
-              className="flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 px-2.5 py-1.5 rounded-full text-xs font-bold transition"
+              className="flex items-center space-x-1 bg-slate-100 hover:bg-slate-200 text-slate-800 pl-1.5 pr-2 py-1 rounded-full text-xs font-bold transition active:scale-95"
             >
               <Avatar name={currentMember?.name || '?'} avatarUrl={currentMember?.avatarUrl} size="xs" />
-              <span className="max-w-[75px] truncate">{currentMember?.name || 'Chọn tôi'}</span>
-              <ChevronDown className="w-3 h-3 text-slate-500" />
+              <span className="max-w-[65px] truncate">{currentMember?.name || 'Chọn tôi'}</span>
+              <ChevronDown className="w-2.5 h-2.5 text-slate-400" />
             </button>
 
             {/* Profile Avatar & Color Picker Button */}
@@ -270,7 +287,7 @@ export function App() {
                 setProfileTargetMember(currentMember);
                 setIsProfileModalOpen(true);
               }}
-              className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition"
+              className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition active:scale-95"
               title="Đổi màu chủ đạo & Ảnh đại diện"
             >
               <Palette className="w-4 h-4" style={{ color: currentTheme.hex }} />
@@ -279,21 +296,22 @@ export function App() {
             {/* Notification bell */}
             <button
               onClick={() => setIsNotificationsOpen(true)}
-              className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl relative transition"
+              className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl relative transition active:scale-95"
+              title="Thông báo nhóm"
             >
-              <Bell className="w-5 h-5" />
+              <Bell className="w-4 h-4" />
               {unreadCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full" />
+                <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full" />
               )}
             </button>
 
             {/* Share / Export */}
             <button
               onClick={() => setIsExportOpen(true)}
-              className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition"
-              title="Xuất Excel / In PDF"
+              className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition active:scale-95"
+              title="Xuất Excel / PDF / Ảnh Mess"
             >
-              <FileSpreadsheet className="w-5 h-5" />
+              <FileSpreadsheet className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -348,9 +366,11 @@ export function App() {
         {activeTab === 'DEBTS' && (
           <DebtsView
             groupCode={currentGroupCode}
+            groupName={groupInfo?.name}
             currentMemberId={currentMember?.id}
             members={members}
             debtsData={debtsData}
+            dashboardData={dashboardData}
             onRefresh={fetchAllData}
             onOpenPaymentModal={handleOpenPayment}
           />
@@ -518,6 +538,17 @@ export function App() {
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}
         groupCode={currentGroupCode}
+        onOpenExportImage={() => setIsExportDebtImageOpen(true)}
+      />
+
+      <ExportDebtImageModal
+        isOpen={isExportDebtImageOpen}
+        onClose={() => setIsExportDebtImageOpen(false)}
+        groupName={groupInfo?.name || 'Nhóm của bạn'}
+        groupCode={currentGroupCode}
+        members={members}
+        debtsData={debtsData}
+        dashboardData={dashboardData}
       />
 
       <NotificationsModal
