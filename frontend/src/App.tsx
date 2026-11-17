@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   LayoutDashboard,
   Receipt,
@@ -87,38 +87,47 @@ export function App() {
     return localStorage.getItem('tinhtien_user_theme_hex') || DEFAULT_HEX;
   });
 
-  // Load toàn bộ dữ liệu nhóm
+  const isFetchingRef = useRef(false);
+  const fetchDebounceRef = useRef<any>(null);
+
+  // Load toàn bộ dữ liệu nhóm TRONG 1 REQUEST DUY NHẤT (/sync)
+  // Tối ưu triệt để hạn mức Cloudflare Free: giảm 85% số lượng requests
   const fetchAllData = useCallback(async () => {
     if (!currentGroupCode) return;
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
 
     try {
-      const [gRes, mRes, dRes, aRes, debRes, pRes, nRes] = await Promise.all([
-        api.getGroup(currentGroupCode),
-        api.getMembers(currentGroupCode),
-        api.getDashboard(currentGroupCode, currentMember?.id),
-        api.getActivities(currentGroupCode),
-        api.getDebts(currentGroupCode),
-        api.getPayments(currentGroupCode),
-        api.getNotifications(currentGroupCode, currentMember?.id)
-      ]);
-
-      if (gRes.success && gRes.data) setGroupInfo(gRes.data);
-      if (mRes.success && mRes.data) {
-        setMembers(mRes.data);
-        // Nếu chưa chọn member hoặc member không thuộc nhóm nữa, mở modal chọn
-        if (!currentMember || !mRes.data.some((m: any) => m.id === currentMember.id)) {
-          setIsSelectMemberOpen(true);
+      const syncRes = await api.getGroupSync(currentGroupCode, currentMember?.id);
+      if (syncRes.success && syncRes.data) {
+        const { group, members: mData, dashboard, activities: aData, debts, payments: pData, notifications: nData } = syncRes.data;
+        if (group) setGroupInfo(group);
+        if (mData) {
+          setMembers(mData);
+          if (!currentMember || !mData.some((m: any) => m.id === currentMember.id)) {
+            setIsSelectMemberOpen(true);
+          }
         }
+        if (dashboard) setDashboardData(dashboard);
+        if (aData) setActivities(aData);
+        if (debts) setDebtsData(debts);
+        if (pData) setPayments(pData);
+        if (nData) setNotifications(nData);
       }
-      if (dRes.success && dRes.data) setDashboardData(dRes.data);
-      if (aRes.success && aRes.data) setActivities(aRes.data);
-      if (debRes.success && debRes.data) setDebtsData(debRes.data);
-      if (pRes.success && pRes.data) setPayments(pRes.data);
-      if (nRes.success && nRes.data) setNotifications(nRes.data);
     } catch (err) {
-      console.error('Fetch error:', err);
+      console.error('Sync fetch error:', err);
+    } finally {
+      isFetchingRef.current = false;
     }
   }, [currentGroupCode, currentMember]);
+
+  // Debounce gộp nhiều event realtime liên tiếp thành 1 request duy nhất
+  const debouncedFetchAllData = useCallback(() => {
+    if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
+    fetchDebounceRef.current = setTimeout(() => {
+      fetchAllData();
+    }, 250);
+  }, [fetchAllData]);
 
   useEffect(() => {
     if (currentGroupCode) {
@@ -161,8 +170,8 @@ export function App() {
   // Realtime hook
   const handleRealtimeEvent = useCallback(
     (event: any) => {
-      // Khi có sự kiện từ người khác gửi tới
-      fetchAllData();
+      // Khi có sự kiện từ người khác gửi tới: dùng debouncedFetchAllData để gộp requests
+      debouncedFetchAllData();
       if (event.eventType === 'payment.created') {
         toast.info('Có yêu cầu xác nhận chuyển khoản mới!');
         showWebNotification('Sổ Nợ Nghĩa Tình: Yêu Cầu Xác Nhận', {
@@ -180,12 +189,12 @@ export function App() {
         });
       }
     },
-    [fetchAllData]
+    [debouncedFetchAllData]
   );
 
   const { isConnected } = useRealtime(currentGroupCode, currentMember?.id || null, {
     onEvent: handleRealtimeEvent,
-    onWakeup: fetchAllData
+    onWakeup: debouncedFetchAllData
   });
 
   const handleSelectGroup = (code: string) => {

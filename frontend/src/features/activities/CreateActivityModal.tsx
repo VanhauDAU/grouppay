@@ -334,10 +334,10 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
           />
         </div>
 
-        {/* 3. Người đứng ra trả tiền (Gọn gàng) */}
+        {/* 3. Người đứng ra trả tiền (Gọn gàng & 1 chạm trên mobile) */}
         {payerMode === 'SINGLE' && (
           <div>
-            <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center justify-between mb-1.5">
               <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
                 Người trả tiền
               </label>
@@ -347,27 +347,38 @@ export const CreateActivityModal: React.FC<CreateActivityModalProps> = ({
                   setPayerMode('MULTIPLE');
                   setShowAdvanced(true);
                 }}
-                className="text-[11px] text-slate-500 hover:text-slate-800 font-semibold"
+                className="text-[11px] text-slate-500 hover:text-slate-800 font-semibold transition"
               >
                 Nhiều người cùng trả?
               </button>
             </div>
 
-            <div className="relative">
-              <select
-                value={singlePayerId}
-                onChange={(e) => setSinglePayerId(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-800 appearance-none transition"
-              >
-                {activeMembers.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name} {m.id === currentMemberId ? '(Bạn đã trả)' : ''}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                <ChevronDown className="w-4 h-4" />
-              </div>
+            {/* Dạng chip 1 chạm tối ưu mobile: Không dùng select native tránh lỗi Safari / PWA */}
+            <div className="flex flex-wrap gap-1.5 p-1 bg-slate-50/70 border border-slate-200/80 rounded-2xl max-h-36 overflow-y-auto">
+              {activeMembers.map((m) => {
+                const isSelected = (singlePayerId || currentMemberId || activeMembers[0]?.id) === m.id;
+                return (
+                  <button
+                    type="button"
+                    key={m.id}
+                    onClick={() => setSinglePayerId(m.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition active:scale-95 ${
+                      isSelected
+                        ? 'bg-slate-900 text-white shadow-2xs font-bold'
+                        : 'bg-white text-slate-600 border border-slate-200/80 hover:bg-slate-100'
+                    }`}
+                  >
+                    <Avatar name={m.name} avatarUrl={m.avatarUrl} size="xs" />
+                    <span>{m.name}</span>
+                    {m.id === currentMemberId && (
+                      <span className={`text-[10px] ${isSelected ? 'text-emerald-300' : 'text-slate-400'}`}>
+                        (Bạn)
+                      </span>
+                    )}
+                    {isSelected && <Check className="w-3.5 h-3.5 stroke-[3] text-emerald-400 ml-0.5" />}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

@@ -47,6 +47,12 @@ export const api = {
   getGroup: (groupCode: string) =>
     apiRequest(`/groups/${groupCode}`, { groupCode }),
 
+  // Đồng bộ toàn bộ dữ liệu chỉ trong 1 request duy nhất (giảm 85% tải Cloudflare Free)
+  getGroupSync: (groupCode: string, memberId?: string | null) => {
+    const query = memberId ? `?memberId=${encodeURIComponent(memberId)}` : '';
+    return apiRequest(`/groups/${groupCode}/sync${query}`, { groupCode, memberId: memberId || undefined });
+  },
+
   joinGroup: (groupCode: string, memberId: string, deviceInfo?: string) =>
     apiRequest(`/groups/${groupCode}/join`, {
       method: 'POST',

@@ -154,23 +154,28 @@ export function useRealtime(
     };
   }, [connect]);
 
-  // Fallback Polling an toàn tuyệt đối:
-  // Nếu WebSocket mất kết nối hoặc bị tường lửa chặn, tự động poll mỗi 5s để không bao giờ lỡ dữ liệu
-  // Khi WebSocket đã kết nối tốt, giãn cách poll mỗi 60s
+  // Fallback Polling tối ưu Cloudflare Free:
+  // - Khi WebSocket đã kết nối: 0 request poll (Durable Objects tự push tức thì khi có biến động)
+  // - Khi WebSocket mất kết nối: chỉ poll mỗi 20s và chỉ khi người dùng đang mở tab
   useEffect(() => {
-    if (!groupCode) return;
+    if (!groupCode || isConnected) {
+      if (fallbackPollRef.current) {
+        clearInterval(fallbackPollRef.current);
+        fallbackPollRef.current = null;
+      }
+      return;
+    }
 
-    const intervalTime = isConnected ? 60000 : 5000;
     fallbackPollRef.current = setInterval(() => {
-      // Chỉ poll khi tab đang hiển thị
       if (document.visibilityState === 'visible') {
         onWakeupRef.current?.();
       }
-    }, intervalTime);
+    }, 20000);
 
     return () => {
       if (fallbackPollRef.current) {
         clearInterval(fallbackPollRef.current);
+        fallbackPollRef.current = null;
       }
     };
   }, [groupCode, isConnected]);
