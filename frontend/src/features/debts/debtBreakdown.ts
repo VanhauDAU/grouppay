@@ -24,6 +24,11 @@ export interface BreakdownItem {
   date?: string;
   /** Người đã trả tiền cho khoản này (người được nợ) */
   payerName: string;
+  /** Người nợ trong khoản này (để tra phần chia của họ) */
+  debtorId: string;
+  debtorName: string;
+  /** Mã hoạt động gốc (khoản chi) */
+  activityId?: string;
   /** +1: người chuyển nợ thêm; -1: được trừ bớt vì người nhận cũng nợ lại */
   sign: 1 | -1;
   /** Số còn nợ của khoản này (sau khi trừ phần đã trả) */
@@ -73,6 +78,9 @@ export function buildTransferBreakdown(
     title: ob.activityTitle || 'Khoản chi',
     date: ob.activityOccurredAt || ob.createdAt,
     payerName: ob.creditorName,
+    debtorId: ob.debtorMemberId,
+    debtorName: ob.debtorName,
+    activityId: ob.sourceType === 'EXPENSE' ? ob.sourceId : undefined,
     sign,
     remaining: ob.remainingAmount,
     original: ob.originalAmount,
@@ -128,4 +136,36 @@ export function buildTransferBreakdown(
   groups.sort((a, b) => b.total - a.total);
 
   return { groups, lines, droppedCount };
+}
+
+export interface ActivitySplitSummary {
+  total: number;
+  people: number;
+  isEqual: boolean;
+  payers: string[];
+  /** Phần phải chịu của người nợ trong hoạt động này */
+  share: number;
+}
+
+/** Tóm tắt cách chia của 1 hoạt động (từ API chi tiết hoạt động) cho 1 người nợ. */
+export function summarizeActivity(detail: any, debtorId: string): ActivitySplitSummary | null {
+  const expenses: any[] = detail?.expenses || [];
+  if (expenses.length === 0) return null;
+  const people = new Set<string>();
+  const payers = new Map<string, string>();
+  let total = 0;
+  let share = 0;
+  let isEqual = true;
+  for (const e of expenses) {
+    total += Number(e.amount) || 0;
+    if (e.split_type && e.split_type !== 'EQUAL') isEqual = false;
+    for (const sp of e.splits || []) {
+      people.add(sp.member_id);
+      if (sp.member_id === debtorId) share += Number(sp.amount_owed) || 0;
+    }
+    for (const p of e.payers || []) {
+      if ((Number(p.amount_paid) || 0) > 0) payers.set(p.member_id, p.member_name);
+    }
+  }
+  return { total, people: people.size, isEqual, payers: [...payers.values()], share };
 }

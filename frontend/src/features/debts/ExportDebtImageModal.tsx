@@ -1,11 +1,18 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Download, Copy, Share2, Check, CheckCircle2, ArrowRight } from 'lucide-react';
 import { Avatar } from '../../components/common/Avatar.js';
 import { Modal } from '../../components/common/Modal.js';
 import { formatVND } from '../../utils/format.js';
 import { toPng, toBlob } from 'html-to-image';
 import { toast } from 'sonner';
-import { buildTransferBreakdown, ROUNDING_OPTIONS, type RoundingUnit, type BreakdownItem } from './debtBreakdown.js';
+import { api } from '../../services/api.js';
+import {
+  buildTransferBreakdown,
+  summarizeActivity,
+  ROUNDING_OPTIONS,
+  type RoundingUnit,
+  type BreakdownItem
+} from './debtBreakdown.js';
 
 interface Member {
   id: string;
@@ -26,6 +33,8 @@ interface ExportDebtImageModalProps {
 
 const PREF_KEY = 'tinhtien_debt_image_prefs';
 const MAX_ITEMS_PER_LINE = 6;
+const CARD_WIDTH = 420;
+const MAX_DETAIL_FETCH = 40;
 
 function loadPrefs(): { unit: RoundingUnit; showDetail: boolean } {
   try {
@@ -44,29 +53,49 @@ const shortDate = (iso?: string) => {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
 
-/** Một dòng giải thích: khoản nào, ai trả, cộng hay trừ bao nhiêu */
-const BreakdownRow: React.FC<{ item: BreakdownItem }> = ({ item }) => {
+/** Một khoản: dòng 1 = tên + số tiền, dòng 2 = tổng hóa đơn, chia mấy người, ai trả */
+const BreakdownRow: React.FC<{ item: BreakdownItem; detail?: any }> = ({ item, detail }) => {
   const plus = item.sign === 1;
+  const split = detail ? summarizeActivity(detail, item.debtorId) : null;
   const meta: string[] = [];
-  if (item.sourceType === 'INITIAL_DEBT') meta.push('nợ cũ nhập tay');
-  else if (item.sourceType === 'ADJUSTMENT') meta.push(`${item.payerName} được hoàn`);
-  else meta.push(`${item.payerName} trả`);
-  if (item.activityTotal && item.activityTotal !== item.original) meta.push(`tổng ${formatVND(item.activityTotal)}`);
-  if (item.settled > 0) meta.push(`đã trả ${formatVND(item.settled)}/${formatVND(item.original)}`);
+
+  if (item.sourceType === 'INITIAL_DEBT') {
+    meta.push('nợ cũ nhập tay');
+  } else if (item.sourceType === 'ADJUSTMENT') {
+    meta.push('hoàn tiền sau khi sửa / hủy');
+  } else if (split) {
+    meta.push(
+      split.isEqual
+        ? `${formatVND(split.total)} chia đều ${split.people} người`
+        : `${formatVND(split.total)} · ${split.people} người, chia theo phần`
+    );
+    meta.push(`${split.payers.length ? split.payers.join(', ') : item.payerName} trả`);
+    // Phần của người nợ khi không tự suy ra được từ "chia đều"
+    if (!split.isEqual || split.payers.length > 1 || split.share !== item.original) {
+      meta.push(`phần ${item.debtorName} ${formatVND(split.share)}`);
+    }
+  } else {
+    if (item.activityTotal) meta.push(`tổng ${formatVND(item.activityTotal)}`);
+    meta.push(`${item.payerName} trả`);
+  }
+  if (!plus) meta.push(`${item.debtorName} nợ lại, được trừ`);
+  if (item.settled > 0) meta.push(`đã trả ${formatVND(item.settled)}`);
 
   return (
-    <div className="flex items-start gap-1.5 text-[10.5px] leading-snug">
-      <span className="w-8 flex-shrink-0 text-slate-400 tabular-nums">{shortDate(item.date)}</span>
+    <div className="flex items-start gap-2 leading-snug">
+      <span className="w-9 flex-shrink-0 pt-px text-[10.5px] text-slate-400 tabular-nums">{shortDate(item.date)}</span>
       <div className="min-w-0 flex-1">
-        <span className="font-semibold text-slate-600">{item.title}</span>
-        {meta.map((m, i) => (
-          <span key={i} className="text-slate-400">
-            {' · '}
-            <span className="whitespace-nowrap">{m}</span>
-          </span>
-        ))}
+        <div className="text-[12px] font-semibold text-slate-700 truncate">{item.title}</div>
+        <div className="text-[10.5px] text-slate-400">
+          {meta.map((m, i) => (
+            <React.Fragment key={i}>
+              {i > 0 && ' · '}
+              <span className="whitespace-nowrap">{m}</span>
+            </React.Fragment>
+          ))}
+        </div>
       </div>
-      <span className={`font-bold tabular-nums whitespace-nowrap ${plus ? 'text-slate-600' : 'text-emerald-600'}`}>
+      <span className={`text-[12px] font-bold tabular-nums whitespace-nowrap ${plus ? 'text-slate-700' : 'text-emerald-600'}`}>
         {plus ? '+' : '−'}
         {formatVND(item.remaining)}
       </span>
@@ -115,6 +144,58 @@ export const ExportDebtImageModal: React.FC<ExportDebtImageModalProps> = ({
     unit
   );
   const totalTransfer = transferPlan.reduce((sum, t) => sum + t.amount, 0);
+
+  // Tải chi tiết cách chia (tổng tiền, số người, ai trả) cho các khoản đang hiện trên ảnh
+  const [details, setDetails] = useState<Record<string, any>>({});
+  const neededKey = [
+    ...new Set(
+      transferPlan.flatMap((t) => t.items.slice(0, MAX_ITEMS_PER_LINE).map((it) => it.activityId || '')).filter(Boolean)
+    )
+  ]
+    .slice(0, MAX_DETAIL_FETCH)
+    .sort()
+    .join(',');
+  useEffect(() => {
+    if (!isOpen || !showDetail || !neededKey) return;
+    let cancelled = false;
+    (async () => {
+      const ids = neededKey.split(',');
+      for (let i = 0; i < ids.length; i += 6) {
+        const batch = ids.slice(i, i + 6);
+        const results = await Promise.all(batch.map((id) => api.getActivityDetail(groupCode, id).catch(() => null)));
+        if (cancelled) return;
+        setDetails((prev) => {
+          const next = { ...prev };
+          batch.forEach((id, k) => {
+            const r: any = results[k];
+            if (r?.success && r.data) next[id] = r.data;
+          });
+          return next;
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, showDetail, neededKey, groupCode]);
+
+  // Thu nhỏ bản xem trước cho vừa màn hình điện thoại; ảnh xuất ra vẫn rộng đủ CARD_WIDTH
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [cardHeight, setCardHeight] = useState(0);
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    const measure = () => {
+      const avail = previewRef.current?.clientWidth || CARD_WIDTH;
+      setScale(Math.min(1, avail / CARD_WIDTH));
+      setCardHeight(cardRef.current?.offsetHeight || 0);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (previewRef.current) ro.observe(previewRef.current);
+    if (cardRef.current) ro.observe(cardRef.current);
+    return () => ro.disconnect();
+  }, [isOpen]);
   const unitLabel = ROUNDING_OPTIONS.find((o) => o.value === unit)?.label;
 
   const currentDateStr = new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -274,11 +355,17 @@ export const ExportDebtImageModal: React.FC<ExportDebtImageModalProps> = ({
         </div>
 
         {/* Xem trước ảnh */}
-        <div className="bg-slate-100/80 p-3 rounded-2xl flex justify-center overflow-x-auto">
+        <div className="bg-slate-100/80 p-3 rounded-2xl">
+          <div
+            ref={previewRef}
+            className="w-full flex justify-center overflow-hidden"
+            style={{ height: cardHeight ? cardHeight * scale : undefined }}
+          >
+            <div style={{ transform: `scale(${scale})`, transformOrigin: 'top center' }}>
           <div
             ref={cardRef}
-            className="w-[340px] bg-white rounded-[22px] overflow-hidden text-slate-900"
-            style={{ fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" }}
+            className="bg-white rounded-[22px] overflow-hidden text-slate-900"
+            style={{ width: CARD_WIDTH, fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" }}
           >
             {/* Đầu thẻ */}
             <div className="px-4 pt-4 pb-3 bg-gradient-to-br from-slate-900 to-slate-700 text-white">
@@ -329,9 +416,9 @@ export const ExportDebtImageModal: React.FC<ExportDebtImageModalProps> = ({
                                   </span>
                                 </div>
                                 {showDetail && t.items.length > 0 && (
-                                  <div className="mt-1 ml-[18px] pl-2 border-l-2 border-slate-200 space-y-0.5">
+                                  <div className="mt-1 ml-[18px] pl-2.5 border-l-2 border-slate-200 space-y-1.5">
                                     {shown.map((it) => (
-                                      <BreakdownRow key={it.id} item={it} />
+                                      <BreakdownRow key={it.id} item={it} detail={it.activityId ? details[it.activityId] : undefined} />
                                     ))}
                                     {rest.length > 0 && (
                                       <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400">
@@ -391,6 +478,8 @@ export const ExportDebtImageModal: React.FC<ExportDebtImageModalProps> = ({
               </div>
             )}
             <div className="pb-2.5 text-center text-[9px] font-semibold text-slate-300">Sổ Nợ Nghĩa Tình</div>
+          </div>
+            </div>
           </div>
         </div>
       </div>
