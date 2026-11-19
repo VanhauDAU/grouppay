@@ -677,6 +677,7 @@ export function App() {
             members={members}
             debtsData={debtsData}
             dashboardData={dashboardData}
+            activities={activities}
             onRefresh={fetchAllData}
             onOpenPaymentModal={handleOpenPayment}
             onOpenRecordReceived={handleOpenRecordReceived}
@@ -817,6 +818,7 @@ export function App() {
         members={members}
         debtsData={debtsData}
         dashboardData={dashboardData}
+        activities={activities}
       />
 
       <NotificationsModal

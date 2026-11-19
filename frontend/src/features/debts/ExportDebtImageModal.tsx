@@ -5,6 +5,7 @@ import { Modal } from '../../components/common/Modal.js';
 import { formatVND } from '../../utils/format.js';
 import { toPng, toBlob } from 'html-to-image';
 import { toast } from 'sonner';
+import { buildTransferBreakdown, ROUNDING_OPTIONS, type RoundingUnit, type BreakdownItem } from './debtBreakdown.js';
 
 interface Member {
   id: string;
@@ -20,7 +21,58 @@ interface ExportDebtImageModalProps {
   members: Member[];
   debtsData: any;
   dashboardData?: any;
+  activities?: any[];
 }
+
+const PREF_KEY = 'tinhtien_debt_image_prefs';
+const MAX_ITEMS_PER_LINE = 6;
+
+function loadPrefs(): { unit: RoundingUnit; showDetail: boolean } {
+  try {
+    const raw = JSON.parse(localStorage.getItem(PREF_KEY) || '{}');
+    const unit = ROUNDING_OPTIONS.some((o) => o.value === raw.unit) ? raw.unit : 0;
+    return { unit, showDetail: raw.showDetail !== false };
+  } catch {
+    return { unit: 0, showDetail: true };
+  }
+}
+
+const shortDate = (iso?: string) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+
+/** Một dòng giải thích: khoản nào, ai trả, cộng hay trừ bao nhiêu */
+const BreakdownRow: React.FC<{ item: BreakdownItem }> = ({ item }) => {
+  const plus = item.sign === 1;
+  const meta: string[] = [];
+  if (item.sourceType === 'INITIAL_DEBT') meta.push('nợ cũ nhập tay');
+  else if (item.sourceType === 'ADJUSTMENT') meta.push(`${item.payerName} được hoàn`);
+  else meta.push(`${item.payerName} trả`);
+  if (item.activityTotal && item.activityTotal !== item.original) meta.push(`tổng ${formatVND(item.activityTotal)}`);
+  if (item.settled > 0) meta.push(`đã trả ${formatVND(item.settled)}/${formatVND(item.original)}`);
+
+  return (
+    <div className="flex items-start gap-1.5 text-[10.5px] leading-snug">
+      <span className="w-8 flex-shrink-0 text-slate-400 tabular-nums">{shortDate(item.date)}</span>
+      <div className="min-w-0 flex-1">
+        <span className="font-semibold text-slate-600">{item.title}</span>
+        {meta.map((m, i) => (
+          <span key={i} className="text-slate-400">
+            {' · '}
+            <span className="whitespace-nowrap">{m}</span>
+          </span>
+        ))}
+      </div>
+      <span className={`font-bold tabular-nums whitespace-nowrap ${plus ? 'text-slate-600' : 'text-emerald-600'}`}>
+        {plus ? '+' : '−'}
+        {formatVND(item.remaining)}
+      </span>
+    </div>
+  );
+};
 
 export const ExportDebtImageModal: React.FC<ExportDebtImageModalProps> = ({
   isOpen,
@@ -29,42 +81,41 @@ export const ExportDebtImageModal: React.FC<ExportDebtImageModalProps> = ({
   groupCode,
   members,
   debtsData,
-  dashboardData
+  dashboardData,
+  activities = []
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
 
-  const { pairwiseDebts = [] } = debtsData || {};
+  const [prefs, setPrefs] = useState(loadPrefs);
+  const updatePrefs = (next: Partial<typeof prefs>) => {
+    setPrefs((p) => {
+      const merged = { ...p, ...next };
+      try {
+        localStorage.setItem(PREF_KEY, JSON.stringify(merged));
+      } catch {
+        /* bỏ qua: trình duyệt chặn lưu trữ */
+      }
+      return merged;
+    });
+  };
+  const { unit, showDetail } = prefs;
+
+  const { pairwiseDebts = [], obligations = [] } = debtsData || {};
   const totalExpense = dashboardData?.group?.totalExpense || 0;
   const memberById = new Map((members as any[]).map((m) => [m.id, m]));
 
   // Dùng NỢ RÒNG TỪNG CẶP: đúng con số app cho phép "Báo trả" (phương án tối giản có thể bảo
   // người A chuyển cho người C mà A không trực tiếp nợ -> app sẽ không ghi nhận được).
-  const transferPlan: { fromId: string; toId: string; from: string; to: string; amount: number }[] = pairwiseDebts
-    .filter((d: any) => d.netAmount > 0)
-    .map((d: any) => ({
-      fromId: d.netDebtorId,
-      toId: d.netCreditorId,
-      from: d.netDebtorId === d.memberAId ? d.memberAName : d.memberBName,
-      to: d.netCreditorId === d.memberAId ? d.memberAName : d.memberBName,
-      amount: d.netAmount
-    }))
-    .sort((x: any, y: any) => x.from.localeCompare(y.from, 'vi') || y.amount - x.amount);
+  const { groups: byDebtor, lines: transferPlan, droppedCount } = buildTransferBreakdown(
+    pairwiseDebts,
+    obligations,
+    activities,
+    unit
+  );
   const totalTransfer = transferPlan.reduce((sum, t) => sum + t.amount, 0);
-
-  // Gom theo người cần trả: đọc 1 khối là biết mình phải chuyển cho ai bao nhiêu
-  const byDebtor: { id: string; name: string; total: number; items: typeof transferPlan }[] = [];
-  for (const t of transferPlan) {
-    let g = byDebtor.find((x) => x.id === t.fromId);
-    if (!g) {
-      g = { id: t.fromId, name: t.from, total: 0, items: [] };
-      byDebtor.push(g);
-    }
-    g.total += t.amount;
-    g.items.push(t);
-  }
-  byDebtor.sort((a, b) => b.total - a.total);
+  const unitLabel = ROUNDING_OPTIONS.find((o) => o.value === unit)?.label;
 
   const currentDateStr = new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
@@ -187,7 +238,42 @@ export const ExportDebtImageModal: React.FC<ExportDebtImageModalProps> = ({
           )}
         </div>
 
-        {/* Xem trước ảnh — thẻ gọn, chỉ giữ thông tin cần để chuyển tiền */}
+        {/* Tùy chọn nội dung ảnh */}
+        <div className="space-y-2.5 rounded-2xl border border-slate-200/80 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Làm tròn</span>
+            <div className="flex rounded-xl bg-slate-100 p-0.5">
+              {ROUNDING_OPTIONS.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => updatePrefs({ unit: o.value })}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
+                    unit === o.value ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <label className="flex items-center justify-between gap-2 cursor-pointer">
+            <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Chi tiết từng khoản</span>
+            <input
+              type="checkbox"
+              checked={showDetail}
+              onChange={(e) => updatePrefs({ showDetail: e.target.checked })}
+              className="w-4 h-4 accent-slate-900"
+            />
+          </label>
+          {unit > 0 && (
+            <p className="text-[10.5px] text-slate-400 leading-snug">
+              Chỉ làm tròn số trên ảnh để chuyển khoản cho tiện. Công nợ trong app vẫn giữ số chính xác.
+            </p>
+          )}
+        </div>
+
+        {/* Xem trước ảnh */}
         <div className="bg-slate-100/80 p-3 rounded-2xl flex justify-center overflow-x-auto">
           <div
             ref={cardRef}
@@ -229,15 +315,53 @@ export const ExportDebtImageModal: React.FC<ExportDebtImageModalProps> = ({
                           <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">chuyển cho</span>
                         </div>
                         <div className="mt-1 pl-8 space-y-0.5">
-                          {g.items.map((t) => (
-                            <div key={t.toId} className="flex items-center gap-1.5 text-[12.5px]">
-                              <ArrowRight className="w-3 h-3 text-slate-300 flex-shrink-0" />
-                              <span className="font-semibold text-slate-700 truncate">{t.to}</span>
-                              <span className="ml-auto font-extrabold text-rose-600 tabular-nums whitespace-nowrap">
-                                {formatVND(t.amount)}
-                              </span>
-                            </div>
-                          ))}
+                          {g.items.map((t) => {
+                            const shown = t.items.slice(0, MAX_ITEMS_PER_LINE);
+                            const rest = t.items.slice(MAX_ITEMS_PER_LINE);
+                            const restSum = rest.reduce((sum, it) => sum + it.sign * it.remaining, 0);
+                            return (
+                              <div key={t.toId} className={showDetail ? 'pb-1' : ''}>
+                                <div className="flex items-center gap-1.5 text-[12.5px]">
+                                  <ArrowRight className="w-3 h-3 text-slate-300 flex-shrink-0" />
+                                  <span className="font-semibold text-slate-700 truncate">{t.to}</span>
+                                  <span className="ml-auto font-extrabold text-rose-600 tabular-nums whitespace-nowrap">
+                                    {formatVND(t.amount)}
+                                  </span>
+                                </div>
+                                {showDetail && t.items.length > 0 && (
+                                  <div className="mt-1 ml-[18px] pl-2 border-l-2 border-slate-200 space-y-0.5">
+                                    {shown.map((it) => (
+                                      <BreakdownRow key={it.id} item={it} />
+                                    ))}
+                                    {rest.length > 0 && (
+                                      <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400">
+                                        <span className="flex-1">+ {rest.length} khoản khác</span>
+                                        <span className="font-bold tabular-nums">
+                                          {restSum >= 0 ? '+' : '−'}
+                                          {formatVND(Math.abs(restSum))}
+                                        </span>
+                                      </div>
+                                    )}
+                                    <div className="flex items-center gap-1.5 pt-0.5 text-[10.5px] border-t border-dashed border-slate-200">
+                                      <span className="flex-1 font-semibold text-slate-500">= Còn nợ</span>
+                                      <span className="font-extrabold tabular-nums text-slate-700">{formatVND(t.exact)}</span>
+                                    </div>
+                                    {t.amount !== t.exact && (
+                                      <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400">
+                                        <span className="flex-1">Làm tròn đến {unitLabel}</span>
+                                        <span className="font-bold tabular-nums text-rose-600">{formatVND(t.amount)}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                {!showDetail && t.amount !== t.exact && (
+                                  <div className="text-right text-[10px] text-slate-400 tabular-nums">
+                                    chính xác {formatVND(t.exact)}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                           {g.items.length > 1 && (
                             <div className="flex items-center justify-end gap-1 pt-0.5 text-[10.5px] text-slate-400">
                               <span>Tổng cộng</span>
@@ -257,6 +381,13 @@ export const ExportDebtImageModal: React.FC<ExportDebtImageModalProps> = ({
               <div className="mx-3 mb-3 px-3 py-2 rounded-xl bg-slate-50 flex items-center justify-between text-[11px]">
                 <span className="text-slate-500 font-semibold">{transferPlan.length} lượt chuyển</span>
                 <span className="font-semibold text-slate-500">Tổng {formatVND(totalTransfer)}</span>
+              </div>
+            )}
+            {(unit > 0 || droppedCount > 0) && (
+              <div className="mx-3 mb-2 text-[9.5px] leading-snug text-slate-400 text-center">
+                {unit > 0 && <>Số chuyển đã làm tròn đến {unitLabel}. </>}
+                {droppedCount > 0 && <>{droppedCount} khoản nhỏ làm tròn về 0đ nên không ghi. </>}
+                Số chính xác xem trong app.
               </div>
             )}
             <div className="pb-2.5 text-center text-[9px] font-semibold text-slate-300">Sổ Nợ Nghĩa Tình</div>

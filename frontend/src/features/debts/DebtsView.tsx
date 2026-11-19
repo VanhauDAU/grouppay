@@ -24,6 +24,7 @@ interface DebtsViewProps {
   members: Member[];
   debtsData: any;
   dashboardData?: any;
+  activities?: any[];
   onRefresh: () => void;
   onOpenRecordReceived?: (debtorId: string, amount: number) => void;
   onOpenPaymentModal: (recipientId?: string, defaultAmount?: number) => void;
@@ -36,6 +37,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({
   members,
   debtsData,
   dashboardData,
+  activities,
   onRefresh,
   onOpenPaymentModal,
   onOpenRecordReceived
@@ -397,6 +399,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({
         members={members}
         debtsData={debtsData}
         dashboardData={dashboardData}
+        activities={activities}
       />
     </div>
   );
