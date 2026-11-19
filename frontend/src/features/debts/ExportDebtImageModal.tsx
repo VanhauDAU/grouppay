@@ -53,52 +53,64 @@ const shortDate = (iso?: string) => {
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
 
-/** Một khoản: dòng 1 = tên + số tiền, dòng 2 = tổng hóa đơn, chia mấy người, ai trả */
-const BreakdownRow: React.FC<{ item: BreakdownItem; detail?: any }> = ({ item, detail }) => {
+/** Số gọn cho phần giải thích: 600.000 -> 600k, 1.200.000 -> 1,2tr (số lẻ giữ nguyên) */
+const shortVND = (n: number) => {
+  if (n >= 1_000_000 && n % 100_000 === 0) return `${(n / 1_000_000).toLocaleString('vi-VN')}tr`;
+  if (n >= 1000 && n % 1000 === 0) return `${(n / 1000).toLocaleString('vi-VN')}k`;
+  return formatVND(n);
+};
+
+/**
+ * Một khoản: dòng 1 = tên · ngày (+ số tiền khi cần), dòng 2 = cách tính.
+ * Ẩn số tiền khi dòng chuyển chỉ có đúng 1 khoản trùng số -> đỡ lặp số.
+ */
+const BreakdownRow: React.FC<{ item: BreakdownItem; detail?: any; toName: string; showAmount: boolean }> = ({
+  item,
+  detail,
+  toName,
+  showAmount
+}) => {
   const plus = item.sign === 1;
   const split = detail ? summarizeActivity(detail, item.debtorId) : null;
   const meta: string[] = [];
 
-  if (item.sourceType === 'INITIAL_DEBT') {
-    meta.push('nợ cũ nhập tay');
-  } else if (item.sourceType === 'ADJUSTMENT') {
-    meta.push('hoàn tiền sau khi sửa / hủy');
-  } else if (split) {
-    meta.push(
-      split.isEqual
-        ? `${formatVND(split.total)} chia đều ${split.people} người`
-        : `${formatVND(split.total)} · ${split.people} người, chia theo phần`
-    );
-    meta.push(`${split.payers.length ? split.payers.join(', ') : item.payerName} trả`);
-    // Phần của người nợ khi không tự suy ra được từ "chia đều"
-    if (!split.isEqual || split.payers.length > 1 || split.share !== item.original) {
-      meta.push(`phần ${item.debtorName} ${formatVND(split.share)}`);
+  if (item.sourceType === 'EXPENSE') {
+    if (split) {
+      meta.push(
+        split.isEqual
+          ? `${shortVND(split.total)} ÷ ${split.people} người`
+          : `${shortVND(split.total)}, ${split.people} người chia theo phần`
+      );
+      const payers = split.payers.length ? split.payers : [item.payerName];
+      // "Bình trả" là hiển nhiên khi đang chuyển cho chính Bình -> chỉ ghi khi khác
+      if (!plus || payers.length > 1 || payers[0] !== toName) meta.push(`${payers.join(', ')} trả`);
+      if (split.share !== item.original) meta.push(`phần ${item.debtorName} ${shortVND(split.share)}`);
+    } else {
+      if (item.activityTotal) meta.push(`tổng ${shortVND(item.activityTotal)}`);
+      if (!plus) meta.push(`${item.payerName} trả`);
     }
-  } else {
-    if (item.activityTotal) meta.push(`tổng ${formatVND(item.activityTotal)}`);
-    meta.push(`${item.payerName} trả`);
   }
-  if (!plus) meta.push(`${item.debtorName} nợ lại, được trừ`);
-  if (item.settled > 0) meta.push(`đã trả ${formatVND(item.settled)}`);
+  if (!plus) meta.push('được trừ');
+  if (item.settled > 0) meta.push(`đã trả bớt ${shortVND(item.settled)}`);
+  const title = item.sourceType === 'INITIAL_DEBT' ? 'Nợ cũ' : item.title;
 
   return (
-    <div className="flex items-start gap-2 leading-snug">
-      <span className="w-9 flex-shrink-0 pt-px text-[10.5px] text-slate-400 tabular-nums">{shortDate(item.date)}</span>
-      <div className="min-w-0 flex-1">
-        <div className="text-[12px] font-semibold text-slate-700 truncate">{item.title}</div>
-        <div className="text-[10.5px] text-slate-400">
-          {meta.map((m, i) => (
-            <React.Fragment key={i}>
-              {i > 0 && ' · '}
-              <span className="whitespace-nowrap">{m}</span>
-            </React.Fragment>
-          ))}
+    <div className="leading-snug">
+      <div className="flex items-baseline gap-2">
+        <div className="min-w-0 flex-1 truncate text-[12px]">
+          <span className="font-semibold text-slate-700">{title}</span>
+          <span className="text-slate-400"> · {shortDate(item.date)}</span>
         </div>
+        {showAmount && (
+          <span
+            className={`text-[12px] font-semibold tabular-nums whitespace-nowrap ${plus ? 'text-slate-600' : 'text-emerald-600'}`}
+          >
+            {plus ? '' : '−'}
+            {formatVND(item.remaining)}
+          </span>
+        )}
       </div>
-      <span className={`text-[12px] font-bold tabular-nums whitespace-nowrap ${plus ? 'text-slate-700' : 'text-emerald-600'}`}>
-        {plus ? '+' : '−'}
-        {formatVND(item.remaining)}
-      </span>
+      {meta.length > 0 && <div className="text-[10.5px] text-slate-400">{meta.join(' · ')}</div>}
     </div>
   );
 };
@@ -143,7 +155,6 @@ export const ExportDebtImageModal: React.FC<ExportDebtImageModalProps> = ({
     activities,
     unit
   );
-  const totalTransfer = transferPlan.reduce((sum, t) => sum + t.amount, 0);
 
   // Tải chi tiết cách chia (tổng tiền, số người, ai trả) cho các khoản đang hiện trên ảnh
   const [details, setDetails] = useState<Record<string, any>>({});
@@ -395,66 +406,58 @@ export const ExportDebtImageModal: React.FC<ExportDebtImageModalProps> = ({
                   {byDebtor.map((g) => {
                     const m: any = memberById.get(g.id);
                     return (
-                      <div key={g.id} className="rounded-2xl border border-slate-100 bg-slate-50/60 px-3 py-2">
+                      <div key={g.id} className="rounded-2xl border border-slate-100 bg-slate-50/60 px-3.5 py-2.5">
                         <div className="flex items-center gap-2">
                           <Avatar name={g.name} avatarUrl={m?.avatarUrl} size="xs" />
                           <span className="text-[13px] font-extrabold text-slate-900 truncate">{g.name}</span>
                           <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">chuyển cho</span>
+                          {g.items.length > 1 && (
+                            <span className="ml-auto text-[10.5px] text-slate-400 whitespace-nowrap">
+                              tổng <span className="font-bold tabular-nums">{formatVND(g.total)}</span>
+                            </span>
+                          )}
                         </div>
-                        <div className="mt-1 pl-8 space-y-0.5">
+                        <div className="mt-1.5 pl-8 space-y-2">
                           {g.items.map((t) => {
                             const shown = t.items.slice(0, MAX_ITEMS_PER_LINE);
                             const rest = t.items.slice(MAX_ITEMS_PER_LINE);
                             const restSum = rest.reduce((sum, it) => sum + it.sign * it.remaining, 0);
+                            const single = t.items.length === 1 && t.items[0].sign === 1 && t.items[0].remaining === t.exact;
                             return (
-                              <div key={t.toId} className={showDetail ? 'pb-1' : ''}>
-                                <div className="flex items-center gap-1.5 text-[12.5px]">
+                              <div key={t.toId}>
+                                <div className="flex items-center gap-1.5 text-[13px]">
                                   <ArrowRight className="w-3 h-3 text-slate-300 flex-shrink-0" />
-                                  <span className="font-semibold text-slate-700 truncate">{t.to}</span>
+                                  <span className="font-bold text-slate-800 truncate">{t.to}</span>
                                   <span className="ml-auto font-extrabold text-rose-600 tabular-nums whitespace-nowrap">
+                                    {t.amount !== t.exact && <span className="font-semibold text-rose-400">≈ </span>}
                                     {formatVND(t.amount)}
                                   </span>
                                 </div>
                                 {showDetail && t.items.length > 0 && (
-                                  <div className="mt-1 ml-[18px] pl-2.5 border-l-2 border-slate-200 space-y-1.5">
+                                  <div className="mt-1 ml-[5px] pl-3 border-l-2 border-slate-200 space-y-1.5">
                                     {shown.map((it) => (
-                                      <BreakdownRow key={it.id} item={it} detail={it.activityId ? details[it.activityId] : undefined} />
+                                      <BreakdownRow
+                                        key={it.id}
+                                        item={it}
+                                        toName={t.to}
+                                        showAmount={!single}
+                                        detail={it.activityId ? details[it.activityId] : undefined}
+                                      />
                                     ))}
                                     {rest.length > 0 && (
-                                      <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400">
+                                      <div className="flex items-baseline gap-2 text-[11px] text-slate-400">
                                         <span className="flex-1">+ {rest.length} khoản khác</span>
-                                        <span className="font-bold tabular-nums">
-                                          {restSum >= 0 ? '+' : '−'}
+                                        <span className="font-semibold tabular-nums">
+                                          {restSum < 0 ? '−' : ''}
                                           {formatVND(Math.abs(restSum))}
                                         </span>
                                       </div>
                                     )}
-                                    <div className="flex items-center gap-1.5 pt-0.5 text-[10.5px] border-t border-dashed border-slate-200">
-                                      <span className="flex-1 font-semibold text-slate-500">= Còn nợ</span>
-                                      <span className="font-extrabold tabular-nums text-slate-700">{formatVND(t.exact)}</span>
-                                    </div>
-                                    {t.amount !== t.exact && (
-                                      <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400">
-                                        <span className="flex-1">Làm tròn đến {unitLabel}</span>
-                                        <span className="font-bold tabular-nums text-rose-600">{formatVND(t.amount)}</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
-                                {!showDetail && t.amount !== t.exact && (
-                                  <div className="text-right text-[10px] text-slate-400 tabular-nums">
-                                    chính xác {formatVND(t.exact)}
                                   </div>
                                 )}
                               </div>
                             );
                           })}
-                          {g.items.length > 1 && (
-                            <div className="flex items-center justify-end gap-1 pt-0.5 text-[10.5px] text-slate-400">
-                              <span>Tổng cộng</span>
-                              <span className="font-bold tabular-nums">{formatVND(g.total)}</span>
-                            </div>
-                          )}
                         </div>
                       </div>
                     );
@@ -463,16 +466,9 @@ export const ExportDebtImageModal: React.FC<ExportDebtImageModalProps> = ({
               )}
             </div>
 
-            {/* Chân thẻ */}
-            {transferPlan.length > 0 && (
-              <div className="mx-3 mb-3 px-3 py-2 rounded-xl bg-slate-50 flex items-center justify-between text-[11px]">
-                <span className="text-slate-500 font-semibold">{transferPlan.length} lượt chuyển</span>
-                <span className="font-semibold text-slate-500">Tổng {formatVND(totalTransfer)}</span>
-              </div>
-            )}
             {(unit > 0 || droppedCount > 0) && (
               <div className="mx-3 mb-2 text-[9.5px] leading-snug text-slate-400 text-center">
-                {unit > 0 && <>Số chuyển đã làm tròn đến {unitLabel}. </>}
+                {unit > 0 && <>≈ là số đã làm tròn đến {unitLabel}. </>}
                 {droppedCount > 0 && <>{droppedCount} khoản nhỏ làm tròn về 0đ nên không ghi. </>}
                 Số chính xác xem trong app.
               </div>
