@@ -99,3 +99,33 @@ export function applyConfirmedPayment(
     status: newStatus
   };
 }
+
+export interface ConfirmedSettlementPlan {
+  allocations: AllocationPlan[];
+  /** Phần tiền vượt quá công nợ hiện tại (do hoạt động bị sửa/hủy sau khi báo trả) -> người nhận nợ lại người trả */
+  excessAmount: number;
+}
+
+/**
+ * Lập kế hoạch trừ nợ TẠI THỜI ĐIỂM XÁC NHẬN (BR-11).
+ * Khác planPaymentAllocation: tiền đã thực sự chuyển nên không bao giờ từ chối vì vượt nợ;
+ * phần vượt được trả về để ghi nhận thành khoản nợ ngược (hoàn tiền), không bị mất.
+ */
+export function planConfirmedSettlement(
+  paymentAmount: number,
+  obligations: Pick<DebtObligation, 'id' | 'remainingAmount' | 'status' | 'createdAt'>[]
+): ConfirmedSettlementPlan {
+  const active = obligations
+    .filter((ob) => ob.status === 'ACTIVE' && ob.remainingAmount > 0)
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+  const allocations: AllocationPlan[] = [];
+  let left = Math.max(0, Math.floor(paymentAmount));
+  for (const ob of active) {
+    if (left <= 0) break;
+    const amount = Math.min(left, ob.remainingAmount);
+    allocations.push({ debtObligationId: ob.id, amount });
+    left -= amount;
+  }
+  return { allocations, excessAmount: left };
+}

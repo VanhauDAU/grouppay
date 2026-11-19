@@ -167,21 +167,29 @@ export function calculateMemberNetBalances(
   totalPaidByMember: Map<string, number> = new Map(),
   totalExpenseByMember: Map<string, number> = new Map()
 ): MemberNetBalance[] {
-  const owedToOthers = new Map<string, number>();
-  const owedByOthers = new Map<string, number>();
-
-  for (const m of members) {
-    owedToOthers.set(m.id, 0);
-    owedByOthers.set(m.id, 0);
-  }
-
+  // Bù trừ theo từng cặp trước khi cộng tổng: "Bạn cần trả" / "Bạn được nhận" phải khớp đúng
+  // danh sách từng người (vốn hiển thị theo nợ ròng từng cặp), tránh trường hợp A nợ B 100k,
+  // B nợ A 30k nhưng thẻ tổng lại báo "cần trả 100k" trong khi danh sách chỉ ghi 70k.
+  const pairNet = new Map<string, number>(); // key "a|b" (a < b) -> a nợ b (âm = b nợ a)
   for (const ob of obligations) {
     if (ob.status === 'CANCELLED') continue;
     const remaining = ob.remainingAmount;
-    if (remaining <= 0) continue;
+    if (remaining <= 0 || ob.debtorMemberId === ob.creditorMemberId) continue;
+    const [a, b] = [ob.debtorMemberId, ob.creditorMemberId].sort();
+    const key = `${a}|${b}`;
+    pairNet.set(key, (pairNet.get(key) || 0) + (ob.debtorMemberId === a ? remaining : -remaining));
+  }
 
-    owedToOthers.set(ob.debtorMemberId, (owedToOthers.get(ob.debtorMemberId) || 0) + remaining);
-    owedByOthers.set(ob.creditorMemberId, (owedByOthers.get(ob.creditorMemberId) || 0) + remaining);
+  const owedToOthers = new Map<string, number>();
+  const owedByOthers = new Map<string, number>();
+  for (const [key, net] of pairNet.entries()) {
+    if (net === 0) continue;
+    const [a, b] = key.split('|');
+    const debtor = net > 0 ? a : b;
+    const creditor = net > 0 ? b : a;
+    const amount = Math.abs(net);
+    owedToOthers.set(debtor, (owedToOthers.get(debtor) || 0) + amount);
+    owedByOthers.set(creditor, (owedByOthers.get(creditor) || 0) + amount);
   }
 
   return members.map((m) => {

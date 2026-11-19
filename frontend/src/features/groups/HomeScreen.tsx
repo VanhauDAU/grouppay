@@ -1,13 +1,28 @@
 import React, { useState } from 'react';
 import { Plus, Users, ArrowRight, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
 import { api } from '../../services/api.js';
+import { normalizeGroupCodeInput } from '@tinhtien/shared';
 import { toast } from 'sonner';
 
-interface RecentGroup {
-  id: string;
-  publicCode: string;
-  name: string;
-  lastVisited: string;
+import {
+  getRecentGroups as loadRecentGroups,
+  removeRecentGroup,
+  upsertRecentGroup,
+  saveOwnerToken,
+  getOwnerToken,
+  type RecentGroup
+} from '../../utils/recentGroups.js';
+
+function visitedLabel(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return 'vừa xong';
+  if (min < 60) return `${min} phút trước`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h} giờ trước`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d} ngày trước`;
+  return new Date(iso).toLocaleDateString('vi-VN');
 }
 
 interface HomeScreenProps {
@@ -22,17 +37,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectGroup }) => {
   const [joinCode, setJoinCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Lấy danh sách nhóm đã truy cập từ LocalStorage
-  const getRecentGroups = (): RecentGroup[] => {
-    try {
-      const saved = localStorage.getItem('tinhtien_recent_groups');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  };
-
-  const [recentGroups] = useState<RecentGroup[]>(getRecentGroups);
+  // Danh sách nhóm đã tham gia trên thiết bị này
+  const [recentGroups, setRecentGroups] = useState<RecentGroup[]>(loadRecentGroups);
 
   const handleAddMemberInput = () => {
     setMembers([...members, '']);
@@ -76,18 +82,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectGroup }) => {
 
     if (res.success && res.data) {
       toast.success('Tạo nhóm thành công!');
-      // Lưu vào recent groups
-      const recents = getRecentGroups();
-      const updated = [
-        {
-          id: res.data.id,
-          publicCode: res.data.publicCode,
-          name: res.data.name,
-          lastVisited: new Date().toISOString()
-        },
-        ...recents.filter((r) => r.publicCode !== res.data.publicCode)
-      ];
-      localStorage.setItem('tinhtien_recent_groups', JSON.stringify(updated.slice(0, 10)));
+      // Thiết bị tạo nhóm giữ "mã chủ nhóm" -> chỉ máy này mới xóa được nhóm
+      if (res.data.accessToken) saveOwnerToken(res.data.publicCode, res.data.accessToken);
+      upsertRecentGroup({
+        id: res.data.id,
+        publicCode: res.data.publicCode,
+        name: res.data.name,
+        memberCount: res.data.members?.length
+      });
       onSelectGroup(res.data.publicCode);
     } else {
       toast.error(res.error || 'Không thể tạo nhóm');
@@ -101,10 +103,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectGroup }) => {
       toast.error('Vui lòng nhập mã nhóm hoặc link');
       return;
     }
-    // Trích xuất mã nếu dán link
-    const match = cleanCode.match(/group\/([a-zA-Z0-9_-]+)/);
-    const extractedCode = match ? match[1] : cleanCode;
-    onSelectGroup(extractedCode);
+    // Nhận mọi kiểu: link đầy đủ, "k7mq-4xpz", "K7MQ 4XPZ"...
+    const code = normalizeGroupCodeInput(cleanCode);
+    if (!code || code.length < 6) {
+      toast.error('Mã nhóm chưa đúng. Mã có dạng như K7MQ-4XPZ hoặc dán nguyên link nhóm.');
+      return;
+    }
+    onSelectGroup(code);
   };
 
   return (
@@ -151,7 +156,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectGroup }) => {
               <form onSubmit={handleJoin} className="flex space-x-2">
                 <input
                   type="text"
-                  placeholder="Nhập mã nhóm hoặc link..."
+                  placeholder="VD: K7MQ-4XPZ hoặc dán link"
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={joinCode}
                   onChange={(e) => setJoinCode(e.target.value)}
                   className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition"
@@ -165,30 +173,82 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onSelectGroup }) => {
               </form>
             </div>
 
-            {/* Nhóm gần đây */}
+            {/* Hướng dẫn nhanh cho người mới (chưa có nhóm nào trên máy) */}
+            {recentGroups.length === 0 && (
+              <div className="bg-white border border-slate-200/80 rounded-3xl p-4 space-y-3">
+                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Bắt đầu trong 3 bước</div>
+                {[
+                  { n: 1, t: 'Tạo nhóm', d: 'Đặt tên nhóm và nhập tên các thành viên — không cần tài khoản.' },
+                  { n: 2, t: 'Gửi link cho cả nhóm', d: 'Mỗi người mở link, chọn đúng tên mình là dùng được ngay.' },
+                  { n: 3, t: 'Ghi chi tiêu', d: 'Ai trả, chia cho ai — app tự tính ai nợ ai, nhắc trả và xác nhận.' }
+                ].map((x) => (
+                  <div key={x.n} className="flex gap-3">
+                    <div className="w-7 h-7 rounded-full bg-emerald-500 text-white text-xs font-black flex items-center justify-center flex-shrink-0">
+                      {x.n}
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-slate-800">{x.t}</div>
+                      <div className="text-xs text-slate-500 leading-snug">{x.d}</div>
+                    </div>
+                  </div>
+                ))}
+                <div className="text-[11px] text-slate-400 pt-1 border-t border-slate-100">
+                  Được mời vào nhóm? Dán link hoặc mã nhóm vào ô ở trên rồi bấm <b>Vào</b>.
+                </div>
+              </div>
+            )}
+
+            {/* Nhóm đã tham gia */}
             {recentGroups.length > 0 && (
               <div className="space-y-2 pt-2">
                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1">
-                  Nhóm đã truy cập gần đây
+                  Nhóm của bạn ({recentGroups.length})
                 </h4>
-                <div className="space-y-2">
+                <div className="space-y-2 stagger">
                   {recentGroups.map((rg) => (
-                    <button
+                    <div
                       key={rg.publicCode}
-                      onClick={() => onSelectGroup(rg.publicCode)}
-                      className="w-full bg-white hover:bg-slate-100/80 border border-slate-200/80 p-4 rounded-2xl flex items-center justify-between text-left transition"
+                      className="group w-full bg-white hover:bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center transition shadow-2xs"
                     >
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-                          <Users className="w-5 h-5" />
+                      <button
+                        type="button"
+                        onClick={() => onSelectGroup(rg.publicCode)}
+                        className="flex-1 min-w-0 flex items-center gap-3 p-3.5 text-left active:scale-[0.99] transition"
+                      >
+                        <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 text-white flex items-center justify-center font-black text-sm flex-shrink-0 shadow-sm">
+                          {rg.name.trim().slice(0, 1).toUpperCase() || <Users className="w-5 h-5" />}
                         </div>
-                        <div>
-                          <div className="font-bold text-slate-800 text-sm">{rg.name}</div>
-                          <div className="text-xs text-slate-400">Mã: {rg.publicCode}</div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="font-extrabold text-slate-800 text-sm truncate">{rg.name}</span>
+                            {getOwnerToken(rg.publicCode) && (
+                              <span className="text-[9px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-md flex-shrink-0">
+                                Bạn tạo
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-400 truncate">
+                            {rg.memberName ? <>Bạn là <b className="text-slate-600">{rg.memberName}</b> · </> : null}
+                            {rg.memberCount ? `${rg.memberCount} người · ` : ''}
+                            {visitedLabel(rg.lastVisited)}
+                          </div>
                         </div>
-                      </div>
-                      <ArrowRight className="w-4 h-4 text-slate-400" />
-                    </button>
+                        <ArrowRight className="w-4 h-4 text-slate-300 ml-auto flex-shrink-0" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          removeRecentGroup(rg.publicCode);
+                          setRecentGroups(loadRecentGroups());
+                          toast.success(`Đã ẩn "${rg.name}" khỏi danh sách (vào lại bằng link/mã bất cứ lúc nào)`);
+                        }}
+                        className="p-3 mr-1 text-slate-300 hover:text-rose-500 rounded-xl"
+                        title="Ẩn khỏi danh sách trên máy này"
+                        aria-label={`Ẩn nhóm ${rg.name}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>

@@ -2,6 +2,11 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './App.js';
 import './index.css';
+import { startAppUpdateWatcher } from './utils/appUpdate.js';
+import { installAudioUnlock } from './utils/sound.js';
+
+startAppUpdateWatcher();
+installAudioUnlock();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

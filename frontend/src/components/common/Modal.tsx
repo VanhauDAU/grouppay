@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -41,17 +42,20 @@ export const Modal: React.FC<ModalProps> = ({
     xl: 'max-w-xl'
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+  // Render ra thẳng <body>: popup mở từ trong một tab không bị "nhốt" dưới menu dưới / header
+  // (vùng nội dung có hiệu ứng chuyển cảnh tạo stacking context riêng).
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
+        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm animate-fade-in"
         onClick={onClose}
       />
 
       {/* Modal Dialog Content */}
       <div
-        className={`relative z-10 w-full ${maxWidthClasses[maxWidth]} bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col animate-in fade-in slide-in-from-bottom-6 sm:slide-in-from-bottom-2 duration-200`}
+        className={`relative z-10 w-full ${maxWidthClasses[maxWidth]} bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-sheet-up`}
+        style={{ maxHeight: 'calc(100dvh - env(safe-area-inset-top) - 12px)' }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
@@ -65,8 +69,12 @@ export const Modal: React.FC<ModalProps> = ({
         </div>
 
         {/* Body */}
-        <div className="p-6 overflow-y-auto no-scrollbar flex-1">{children}</div>
+        <div className="p-6 overflow-y-auto no-scrollbar flex-1" style={{ paddingBottom: 'calc(1.5rem + env(safe-area-inset-bottom))' }}>
+          {children}
+        </div>
       </div>
     </div>
+  ,
+    document.body
   );
 };

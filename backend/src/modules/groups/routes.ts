@@ -1,17 +1,28 @@
 import { Hono } from 'hono';
-import { nanoid } from 'nanoid';
+import { nanoid, customAlphabet } from 'nanoid';
 import {
   CreateGroupSchema,
   UpdateGroupSchema,
   UpdateGroupSettingsSchema,
-  calculateMemberNetBalances,
-  calculatePairwiseDebts,
-  optimizeSettlements
+  GROUP_CODE_ALPHABET,
+  GROUP_CODE_LENGTH,
+  formatGroupCode
 } from '@tinhtien/shared';
+
+// Mã tham gia dễ đọc: K7MQ4XPZ (hiển thị K7MQ-4XPZ)
+const generateGroupCode = customAlphabet(GROUP_CODE_ALPHABET, GROUP_CODE_LENGTH);
 import type { AppEnv } from '../../middleware/groupAuth.js';
-import { requireGroup } from '../../middleware/groupAuth.js';
+import { requireGroup, invalidateGroupCache } from '../../middleware/groupAuth.js';
 import { getDb } from '../../db/db.js';
 import { logAudit, broadcastGroupEvent } from '../../services/realtime.js';
+import {
+  loadMembersWithBank,
+  loadMappedObligations,
+  loadTotalExpense,
+  listPaymentsWithRecipient,
+  computeBalances,
+  buildPersonal
+} from '../../services/snapshot.js';
 
 export const groupsRouter = new Hono<AppEnv>();
 
@@ -27,7 +38,13 @@ groupsRouter.post('/', async (c) => {
   const db = getDb(c.env);
   const now = new Date().toISOString();
   const groupId = nanoid();
-  const publicCode = nanoid(10);
+  // Gần như không thể trùng, nhưng vẫn kiểm tra cho chắc (UNIQUE ở DB là chốt chặn cuối)
+  let publicCode = generateGroupCode();
+  for (let i = 0; i < 3; i++) {
+    const exists = await db.queryFirst<{ id: string }>(`SELECT id FROM groups WHERE public_code = ?`, [publicCode]);
+    if (!exists) break;
+    publicCode = generateGroupCode();
+  }
   const accessToken = nanoid(24);
 
   const statements = [
@@ -71,7 +88,8 @@ groupsRouter.post('/', async (c) => {
       name,
       description,
       members: createdMembers,
-      inviteUrl: `/group/${publicCode}?token=${accessToken}`
+      displayCode: formatGroupCode(publicCode),
+      inviteUrl: `/group/${publicCode}`
     }
   });
 });
@@ -119,69 +137,21 @@ groupsRouter.get('/:groupCode', requireGroup, async (c) => {
 });
 
 // Endpoint đồng bộ toàn bộ dữ liệu nhóm TRONG 1 REQUEST DUY NHẤT
-// Giúp giảm 85% số lượng requests lên Cloudflare Workers (tối ưu tuyệt đối gói Free)
+// Toàn bộ truy vấn chạy song song, không có truy vấn lặp N+1 -> rows read D1 ổn định theo kích thước nhóm.
 groupsRouter.get('/:groupCode/sync', requireGroup, async (c) => {
   const group = c.get('group');
   const currentMember = c.get('currentMember');
   const db = getDb(c.env);
 
-  // Thực hiện đồng thời các truy vấn SQL cốt lõi bằng Promise.all
-  const [
-    members,
-    settings,
-    obligations,
-    totalExpenseResult,
-    pendingPayments,
-    activities,
-    notifications
-  ] = await Promise.all([
-    // 1. Thành viên kèm ngân hàng
-    db.queryAll<any>(
-      `SELECT m.id, m.name, m.avatar_url as avatarUrl, m.status, m.created_at,
-              b.bank_bin as bankBin, b.bank_code as bankCode, b.bank_name as bankName,
-              b.account_number as accountNumber, b.account_holder as accountHolder,
-              b.is_qr_enabled as isQrEnabled
-       FROM members m
-       LEFT JOIN bank_accounts b ON b.member_id = m.id
-       WHERE m.group_id = ?
-       ORDER BY m.created_at ASC`,
-      [group.id]
-    ),
-    // 2. Cài đặt nhóm
+  const [members, settings, mappedObligations, totalExpense, payments, activities, notifications] = await Promise.all([
+    loadMembersWithBank(db, group.id),
     db.queryFirst<any>(
       `SELECT reminder_day_of_week, reminder_hour, is_reminder_enabled FROM group_settings WHERE group_id = ?`,
       [group.id]
     ),
-    // 3. Nghĩa vụ nợ gốc
-    db.queryAll<any>(
-      `SELECT ob.*,
-              m1.name as debtor_name,
-              m2.name as creditor_name,
-              a.title as activity_title,
-              a.occurred_at as activity_occurred_at
-       FROM debt_obligations ob
-       JOIN members m1 ON m1.id = ob.debtor_member_id
-       JOIN members m2 ON m2.id = ob.creditor_member_id
-       LEFT JOIN activities a ON a.id = ob.source_id AND ob.source_type = 'EXPENSE'
-       WHERE ob.group_id = ? AND ob.status != 'CANCELLED'
-       ORDER BY ob.created_at DESC`,
-      [group.id]
-    ),
-    // 4. Tổng chi tiêu
-    db.queryFirst<{ total: number }>(
-      `SELECT COALESCE(SUM(amount), 0) as total FROM expenses WHERE group_id = ?`,
-      [group.id]
-    ),
-    // 5. Giao dịch thanh toán
-    db.queryAll<any>(
-      `SELECT p.*, m.name as payer_name
-       FROM payments p
-       JOIN members m ON m.id = p.payer_member_id
-       WHERE p.group_id = ?
-       ORDER BY p.created_at DESC`,
-      [group.id]
-    ),
-    // 6. Hoạt động chi tiêu
+    loadMappedObligations(db, group.id),
+    loadTotalExpense(db, group.id),
+    listPaymentsWithRecipient(db, group.id),
     db.queryAll<any>(
       `SELECT a.*,
               COALESCE(SUM(e.amount), 0) as total_amount,
@@ -193,147 +163,32 @@ groupsRouter.get('/:groupCode/sync', requireGroup, async (c) => {
        ORDER BY a.occurred_at DESC LIMIT 50`,
       [group.id]
     ),
-    // 7. Thông báo
-    db.queryAll<any>(
-      `SELECT * FROM notifications
-       WHERE group_id = ? AND (target_member_id IS NULL OR target_member_id = ?)
-       ORDER BY created_at DESC LIMIT 30`,
-      [group.id, currentMember?.id || '']
-    )
+    currentMember
+      ? db.queryAll<any>(
+          `SELECT * FROM notifications
+           WHERE group_id = ? AND (target_member_id IS NULL OR target_member_id = ?)
+           ORDER BY created_at DESC LIMIT 30`,
+          [group.id, currentMember.id]
+        )
+      : db.queryAll<any>(
+          `SELECT * FROM notifications
+           WHERE group_id = ? AND target_member_id IS NULL
+           ORDER BY created_at DESC LIMIT 30`,
+          [group.id]
+        )
   ]);
 
-  // Phân bổ thanh toán cho từng payment
-  const paymentsWithAllocations = await Promise.all(
-    pendingPayments.map(async (p: any) => {
-      const allocations = await db.queryAll<any>(
-        `SELECT pa.*, m.name as recipient_name
-         FROM payment_allocations pa
-         JOIN members m ON m.id = pa.recipient_member_id
-         WHERE pa.payment_id = ?`,
-        [p.id]
-      );
-      return {
-        ...p,
-        allocations
-      };
-    })
-  );
-
-  // Map obligations
-  const mappedObligations = obligations.map((ob: any) => ({
-    ...ob,
-    debtorMemberId: ob.debtor_member_id,
-    creditorMemberId: ob.creditor_member_id,
-    debtorName: ob.debtor_name,
-    creditorName: ob.creditor_name,
-    originalAmount: ob.original_amount,
-    settledAmount: ob.settled_amount,
-    remainingAmount: Math.max(0, ob.original_amount - ob.settled_amount),
-    sourceType: ob.source_type,
-    sourceId: ob.source_id,
-    activityTitle: ob.activity_title || (ob.source_type === 'INITIAL_DEBT' ? 'Công nợ ban đầu' : 'Khoản chi'),
-    activityOccurredAt: ob.activity_occurred_at || ob.created_at,
-    createdAt: ob.created_at,
-    updatedAt: ob.updated_at
-  }));
-
-  // Tính toán công nợ và số dư
-  const netBalances = calculateMemberNetBalances(members, mappedObligations as any);
-  const pairwiseDebts = calculatePairwiseDebts(members, mappedObligations as any);
-  const settlementProposals = optimizeSettlements(netBalances);
-  const totalExpense = totalExpenseResult?.total || 0;
-
-  // Tính toán dữ liệu cá nhân nếu có currentMember
-  let personal: any = null;
-  if (currentMember) {
-    const myBalance = netBalances.find((b) => b.memberId === currentMember.id);
-    const peopleIOwe = pairwiseDebts
-      .filter((p) => p.netDebtorId === currentMember.id)
-      .map((p) => {
-        const creditorMember = members.find((m: any) => m.id === p.netCreditorId);
-        return {
-          creditorId: p.netCreditorId,
-          creditorName: p.netCreditorId === p.memberAId ? p.memberAName : p.memberBName,
-          avatarUrl: creditorMember?.avatarUrl || null,
-          amount: p.netAmount,
-          bankAccount: creditorMember?.accountNumber
-            ? {
-                bankBin: creditorMember.bankBin,
-                bankCode: creditorMember.bankCode,
-                bankName: creditorMember.bankName,
-                accountNumber: creditorMember.accountNumber,
-                accountHolder: creditorMember.accountHolder,
-                isQrEnabled: Boolean(creditorMember.isQrEnabled)
-              }
-            : null
-        };
-      });
-
-    const peopleOweMe = pairwiseDebts
-      .filter((p) => p.netCreditorId === currentMember.id)
-      .map((p) => {
-        const debtorMember = members.find((m: any) => m.id === p.netDebtorId);
-        return {
-          debtorId: p.netDebtorId,
-          debtorName: p.netDebtorId === p.memberAId ? p.memberAName : p.memberBName,
-          avatarUrl: debtorMember?.avatarUrl || null,
-          amount: p.netAmount
-        };
-      });
-
-    const myPendingReceived = paymentsWithAllocations.filter(
-      (p: any) => p.status === 'PENDING' && p.allocations?.some((a: any) => a.recipient_member_id === currentMember.id)
-    );
-    const myPendingSent = paymentsWithAllocations.filter(
-      (p: any) => p.status === 'PENDING' && p.payer_member_id === currentMember.id
-    );
-
-    const currentMemberRecord = members.find((m: any) => m.id === currentMember.id);
-
-    personal = {
-      memberId: currentMember.id,
-      memberName: currentMember.name,
-      avatarUrl: currentMemberRecord?.avatarUrl || null,
-      totalOwedToOthers: myBalance?.totalOwedToOthers || 0,
-      totalOwedByOthers: myBalance?.totalOwedByOthers || 0,
-      netBalance: myBalance?.netBalance || 0,
-      peopleIOwe,
-      peopleOweMe,
-      pendingReceived: myPendingReceived,
-      pendingSent: myPendingSent
-    };
-  }
-
-  const netBalancesWithAvatar = netBalances.map((b) => {
-    const mem = members.find((m: any) => m.id === b.memberId);
-    return {
-      ...b,
-      avatarUrl: mem?.avatarUrl || null
-    };
-  });
-
-  const dashboardData = {
-    group: {
-      id: group.id,
-      name: group.name,
-      currency: group.currency,
-      totalExpense,
-      memberBalances: netBalancesWithAvatar
-    },
-    personal,
-    netBalances: netBalancesWithAvatar,
-    pairwiseDebts,
-    settlementProposals,
-    pendingPayments: paymentsWithAllocations.filter((p: any) => p.status === 'PENDING'),
-    recentActivities: activities.slice(0, 5)
-  };
+  const balances = computeBalances(members, mappedObligations);
+  const { netBalances, pairwiseDebts, settlementProposals } = balances;
+  const personal = currentMember ? buildPersonal(currentMember, members, balances, payments) : null;
+  const pendingPayments = payments.filter((p: any) => p.status === 'PENDING_CONFIRMATION');
 
   const formattedNotifications = notifications.map((n: any) => ({
     id: n.id,
     type: n.type,
     title: n.title,
     message: n.message,
-    data: n.data ? JSON.parse(n.data) : null,
+    data: n.data ? safeJson(n.data) : null,
     isRead: Boolean(n.is_read),
     createdAt: n.created_at
   }));
@@ -346,7 +201,6 @@ groupsRouter.get('/:groupCode/sync', requireGroup, async (c) => {
         publicCode: group.publicCode,
         name: group.name,
         currency: group.currency,
-        members,
         settings: settings
           ? {
               reminderDayOfWeek: settings.reminder_day_of_week,
@@ -356,7 +210,20 @@ groupsRouter.get('/:groupCode/sync', requireGroup, async (c) => {
           : null
       },
       members,
-      dashboard: dashboardData,
+      dashboard: {
+        group: {
+          id: group.id,
+          name: group.name,
+          currency: group.currency,
+          totalExpense,
+          memberBalances: netBalances
+        },
+        personal,
+        netBalances,
+        pairwiseDebts,
+        settlementProposals,
+        pendingPayments
+      },
       activities,
       debts: {
         pairwiseDebts,
@@ -364,11 +231,73 @@ groupsRouter.get('/:groupCode/sync', requireGroup, async (c) => {
         settlementProposals,
         obligations: mappedObligations
       },
-      payments: paymentsWithAllocations,
+      payments,
       notifications: formattedNotifications
     }
   });
 });
+
+function safeJson(value: string) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+// Xóa nhóm vĩnh viễn — CHỈ người tạo nhóm (giữ mã chủ nhóm trả về lúc tạo nhóm)
+groupsRouter.delete('/:groupCode', requireGroup, async (c) => {
+  const group = c.get('group');
+  const ownerToken = c.req.header('X-Owner-Token') || '';
+  if (!ownerToken || !timingSafeEqual(ownerToken, group.accessToken)) {
+    return c.json({ success: false, error: 'Chỉ người tạo nhóm (trên thiết bị đã tạo nhóm) mới được xóa nhóm' }, 403);
+  }
+  const body = await c.req.json().catch(() => ({}));
+  if (typeof body?.confirmName !== 'string' || body.confirmName.trim() !== group.name.trim()) {
+    return c.json({ success: false, error: 'Tên nhóm nhập xác nhận không khớp' }, 400);
+  }
+
+  const db = getDb(c.env);
+  const g = group.id;
+  const members = `SELECT id FROM members WHERE group_id = ?`;
+  const expenses = `SELECT id FROM expenses WHERE group_id = ?`;
+  // Xóa từ bảng con lên bảng cha trong 1 transaction (không phụ thuộc cấu hình cascade)
+  const results = await db.batchResults([
+    db.prepare(`DELETE FROM payment_allocations WHERE payment_id IN (SELECT id FROM payments WHERE group_id = ?)`, [g]),
+    db.prepare(`DELETE FROM payments WHERE group_id = ?`, [g]),
+    db.prepare(`DELETE FROM debt_obligations WHERE group_id = ?`, [g]),
+    db.prepare(`DELETE FROM debt_adjustments WHERE group_id = ?`, [g]),
+    db.prepare(`DELETE FROM activity_revisions WHERE group_id = ?`, [g]),
+    db.prepare(`DELETE FROM expense_splits WHERE expense_id IN (${expenses})`, [g]),
+    db.prepare(`DELETE FROM expense_payers WHERE expense_id IN (${expenses})`, [g]),
+    db.prepare(`DELETE FROM expenses WHERE group_id = ?`, [g]),
+    db.prepare(`DELETE FROM activities WHERE group_id = ?`, [g]),
+    db.prepare(`DELETE FROM bank_accounts WHERE member_id IN (${members})`, [g]),
+    db.prepare(`DELETE FROM member_sessions WHERE group_id = ?`, [g]),
+    db.prepare(`DELETE FROM push_subscriptions WHERE group_id = ?`, [g]),
+    db.prepare(`DELETE FROM notifications WHERE group_id = ?`, [g]),
+    db.prepare(`DELETE FROM audit_logs WHERE group_id = ?`, [g]),
+    db.prepare(`DELETE FROM group_settings WHERE group_id = ?`, [g]),
+    db.prepare(`DELETE FROM members WHERE group_id = ?`, [g]),
+    db.prepare(`DELETE FROM groups WHERE id = ?`, [g])
+  ]);
+  if (!results.every((r) => r.success) || (results[results.length - 1]?.meta?.changes ?? 0) !== 1) {
+    return c.json({ success: false, error: 'Không thể xóa nhóm, vui lòng thử lại' }, 500);
+  }
+
+  invalidateGroupCache(group.id, group.publicCode);
+  // Báo các thiết bị đang mở nhóm quay về màn hình chính
+  await broadcastGroupEvent(c.env, group.id, 'group.deleted', group.id, null, { name: group.name });
+
+  return c.json({ success: true, message: 'Đã xóa nhóm' });
+});
+
+function timingSafeEqual(a: string, b: string) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
 
 // Cập nhật thông tin nhóm
 groupsRouter.patch('/:groupCode', requireGroup, async (c) => {
@@ -387,6 +316,7 @@ groupsRouter.patch('/:groupCode', requireGroup, async (c) => {
     `UPDATE groups SET name = COALESCE(?, name), description = COALESCE(?, description), updated_at = ? WHERE id = ?`,
     [name || null, description !== undefined ? description : null, now, group.id]
   );
+  invalidateGroupCache(group.id, group.publicCode);
 
   return c.json({ success: true, message: 'Cập nhật nhóm thành công' });
 });
@@ -416,9 +346,9 @@ groupsRouter.post('/:groupCode/join', requireGroup, async (c) => {
   const now = new Date().toISOString();
 
   await db.execute(
-    `INSERT INTO member_sessions (id, group_id, member_id, token, deviceInfo, last_active_at, created_at)
+    `INSERT INTO member_sessions (id, group_id, member_id, token, device_info, last_active_at, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [nanoid(), group.id, member.id, sessionToken, deviceInfo, now, now]
+    [nanoid(), group.id, member.id, sessionToken, String(deviceInfo || '').slice(0, 255), now, now]
   );
 
   return c.json({

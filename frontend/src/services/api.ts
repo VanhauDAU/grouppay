@@ -8,7 +8,7 @@ interface RequestOptions extends RequestInit {
 export async function apiRequest<T = any>(
   path: string,
   options: RequestOptions = {}
-): Promise<{ success: boolean; data?: T; error?: string; message?: string }> {
+): Promise<{ success: boolean; data?: T; error?: string; message?: string; status?: number; code?: string }> {
   const { groupCode, memberId, headers: customHeaders, ...rest } = options;
 
   const headers: Record<string, string> = {
@@ -29,8 +29,8 @@ export async function apiRequest<T = any>(
       ...rest
     });
 
-    const json = await res.json();
-    return json;
+    const json = await res.json().catch(() => ({ success: false, error: `Lỗi máy chủ (${res.status})` }));
+    return { ...json, status: res.status };
   } catch (err: any) {
     return {
       success: false,
@@ -43,6 +43,15 @@ export const api = {
   // Groups
   createGroup: (data: { name: string; description?: string; initialMembers: string[] }) =>
     apiRequest('/groups', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Xóa nhóm vĩnh viễn (chỉ thiết bị giữ mã chủ nhóm)
+  deleteGroup: (groupCode: string, ownerToken: string, confirmName: string) =>
+    apiRequest(`/groups/${groupCode}`, {
+      method: 'DELETE',
+      groupCode,
+      headers: { 'X-Owner-Token': ownerToken },
+      body: JSON.stringify({ confirmName })
+    }),
 
   getGroup: (groupCode: string) =>
     apiRequest(`/groups/${groupCode}`, { groupCode }),
@@ -164,6 +173,19 @@ export const api = {
       groupCode,
       memberId,
       body: JSON.stringify({ reason })
+    }),
+
+  // Người được nợ tự ghi nhận đã nhận tiền (trả ngoài app / quên báo trả)
+  recordReceived: (
+    groupCode: string,
+    memberId: string,
+    data: { debtorMemberId: string; amount: number; note?: string; idempotencyKey: string }
+  ) =>
+    apiRequest(`/groups/${groupCode}/payments/record-received`, {
+      method: 'POST',
+      groupCode,
+      memberId,
+      body: JSON.stringify(data)
     }),
 
   cancelPayment: (groupCode: string, memberId: string, paymentId: string) =>

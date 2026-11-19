@@ -4,6 +4,9 @@ import type { RealtimeMessage } from '@tinhtien/shared';
 export class GroupRoomDO extends DurableObject {
   constructor(ctx: DurableObjectState, env: any) {
     super(ctx, env);
+    // Heartbeat "ping" được Cloudflare tự trả "pong" mà KHÔNG đánh thức Durable Object
+    // (không tính phí duration, room vẫn ngủ đông giữa các sự kiện).
+    this.ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping', 'pong'));
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -20,14 +23,6 @@ export class GroupRoomDO extends DurableObject {
 
       const memberId = url.searchParams.get('memberId') || 'anonymous';
       this.ctx.acceptWebSocket(server, [memberId]);
-
-      // Gửi message chào mừng
-      server.send(
-        JSON.stringify({
-          type: 'connected',
-          timestamp: new Date().toISOString()
-        })
-      );
 
       return new Response(null, {
         status: 101,
@@ -47,6 +42,7 @@ export class GroupRoomDO extends DurableObject {
   }
 
   webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): void {
+    // Client cũ (trước khi cập nhật) còn gửi ping dạng JSON -> vẫn trả lời để không bị ngắt
     try {
       const data = JSON.parse(typeof message === 'string' ? message : new TextDecoder().decode(message));
       if (data.type === 'ping') {
@@ -58,7 +54,11 @@ export class GroupRoomDO extends DurableObject {
   }
 
   webSocketClose(ws: WebSocket, code: number, reason: string): void {
-    ws.close(code, reason);
+    try {
+      ws.close(code, reason);
+    } catch {
+      // đã đóng
+    }
   }
 
   webSocketError(ws: WebSocket, error: unknown): void {

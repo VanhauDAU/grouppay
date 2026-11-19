@@ -18,38 +18,44 @@ interface DashboardViewProps {
   data: any;
   currentTheme: ThemeColor;
   onOpenPaymentModal: (recipientId?: string, defaultAmount?: number) => void;
+  onOpenRecordReceived?: (debtorId: string, amount: number) => void;
   onOpenCreateActivity: () => void;
-  onConfirmPayment: (paymentId: string) => void;
+  onConfirmPayment: (paymentId: string) => Promise<boolean> | void;
+  busyPaymentIds?: string[];
   onRejectPayment: (paymentId: string) => void;
   onOpenSelectMember: () => void;
   onOpenBankConfig?: () => void;
   onOpenProfileModal?: () => void;
   onNavigateToActivities?: () => void;
   onNavigateToDebts?: () => void;
+  onStartTour?: () => void;
+  onShareLink?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   data,
   currentTheme,
   onOpenPaymentModal,
+  onOpenRecordReceived,
   onOpenCreateActivity,
   onConfirmPayment,
+  busyPaymentIds = [],
   onRejectPayment,
   onOpenSelectMember,
   onOpenBankConfig,
   onOpenProfileModal,
   onNavigateToActivities,
-  onNavigateToDebts
+  onNavigateToDebts,
+  onStartTour,
+  onShareLink
 }) => {
   const { personal, group, netBalances } = data || {};
 
-  const handleConfirmWithConfetti = (paymentId: string) => {
-    confetti({
-      particleCount: 70,
-      spread: 60,
-      origin: { y: 0.7 }
-    });
-    onConfirmPayment(paymentId);
+  const handleConfirmWithConfetti = async (paymentId: string) => {
+    const ok = await onConfirmPayment(paymentId);
+    if (ok) {
+      confetti({ particleCount: 70, spread: 60, origin: { y: 0.7 } });
+    }
   };
 
   // Loading skeleton nếu chưa có dữ liệu
@@ -64,10 +70,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }
 
   return (
-    <div className="space-y-4 pb-20">
+    <div className="space-y-4 pb-20 stagger">
       {/* 1. Thẻ số dư cá nhân Sinh Động, Hiệu Ứng Màu Sắc Tương Tác */}
       {personal ? (
         <div
+          data-tour="balance-card"
           className="rounded-3xl border p-5 relative overflow-hidden transition-all duration-300 shadow-md hover:shadow-lg"
           style={{
             background: `linear-gradient(135deg, ${currentTheme.hex}18 0%, #ffffff 50%, ${currentTheme.hex}0c 100%)`,
@@ -174,9 +181,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <button
               onClick={onOpenCreateActivity}
-              className={`text-white font-extrabold py-3 px-3 rounded-2xl text-xs flex items-center justify-center space-x-1.5 shadow-md transition transform active:scale-95 ${
-                personal.totalOwedToOthers > 0 ? 'flex-1' : 'w-full'
-              }`}
+              className={`text-white font-extrabold py-3 px-3 rounded-2xl text-xs flex items-center justify-center space-x-1.5 shadow-md transition transform active:scale-95 ${personal.totalOwedToOthers > 0 ? 'flex-1' : 'w-full'
+                }`}
               style={{ backgroundColor: currentTheme.hex }}
             >
               <Plus className="w-4 h-4 stroke-[3]" />
@@ -205,6 +211,36 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       )}
 
+      {/* Gợi ý cho nhóm mới: chưa có khoản chi nào */}
+      {personal && !group?.totalExpense && !(netBalances || []).some((b: any) => b.netBalance !== 0) && (
+        <div className="bg-white border border-dashed border-slate-300 p-4 rounded-3xl text-center space-y-3">
+          <div className="text-3xl">🧾</div>
+          <div>
+            <div className="text-sm font-extrabold text-slate-800">Nhóm chưa có khoản chi nào</div>
+            <div className="text-xs text-slate-500 mt-0.5">
+              Thêm khoản đầu tiên — app sẽ tự chia và cho mọi người biết ai cần trả bao nhiêu.
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={onOpenCreateActivity}
+              className="flex-1 text-white font-bold text-xs py-2.5 rounded-xl active:scale-95 transition"
+              style={{ backgroundColor: currentTheme.hex }}
+            >
+              + Thêm khoản chi đầu tiên
+            </button>
+            {onShareLink && (
+              <button
+                onClick={onShareLink}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-2.5 rounded-xl active:scale-95 transition"
+              >
+                🔗 Mời bạn bè
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 2. Giao dịch cần bạn xác nhận */}
       {personal?.pendingReceived && personal.pendingReceived.length > 0 && (
         <div className="bg-white border border-amber-200 p-4 rounded-3xl shadow-xs space-y-2.5">
@@ -229,14 +265,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="flex items-center space-x-1.5">
                   <button
                     onClick={() => handleConfirmWithConfetti(p.id)}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center space-x-1 shadow-2xs transition"
+                    disabled={busyPaymentIds.includes(p.id)}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center space-x-1 shadow-2xs transition active:scale-95 disabled:opacity-60"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Đã nhận</span>
+                    <span>{busyPaymentIds.includes(p.id) ? 'Đang xử lý' : 'Đã nhận'}</span>
                   </button>
                   <button
                     onClick={() => onRejectPayment(p.id)}
-                    className="bg-white hover:bg-slate-100 text-rose-600 font-semibold text-xs px-2.5 py-1.5 rounded-xl border border-slate-200 transition"
+                    disabled={busyPaymentIds.includes(p.id)}
+                    className="bg-white hover:bg-slate-100 text-rose-600 font-semibold text-xs px-2.5 py-1.5 rounded-xl border border-slate-200 transition disabled:opacity-60"
                   >
                     <XCircle className="w-3.5 h-3.5" />
                   </button>
@@ -244,6 +282,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* 2b. Yêu cầu mình đã gửi, đang chờ người nhận xác nhận */}
+      {personal?.pendingSent && personal.pendingSent.length > 0 && (
+        <div className="bg-amber-50/60 border border-amber-200/80 p-3.5 rounded-3xl space-y-1.5">
+          <div className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">
+            Đang chờ xác nhận ({personal.pendingSent.length})
+          </div>
+          {personal.pendingSent.map((p: any) => (
+            <div key={p.id} className="flex items-center justify-between text-xs">
+              <span className="text-slate-600">
+                Bạn → <b className="text-slate-800">{p.recipient_name || 'người nhận'}</b>
+              </span>
+              <span className="font-extrabold text-amber-700">{formatVND(p.total_amount)}</span>
+            </div>
+          ))}
         </div>
       )}
 
@@ -260,28 +315,37 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            {personal.peopleIOwe.map((item: any) => (
-              <div
-                key={item.creditorId}
-                className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center justify-between"
-              >
-                <div className="flex items-center space-x-3">
-                  <Avatar name={item.creditorName} avatarUrl={item.avatarUrl} size="sm" />
-                  <div>
-                    <div className="font-bold text-slate-800 text-xs">{item.creditorName}</div>
-                    <div className="text-xs font-extrabold text-rose-500">Cần trả: {formatVND(item.amount)}</div>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => onOpenPaymentModal(item.creditorId, item.amount)}
-                  className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition active:scale-95 shadow-2xs"
+            {personal.peopleIOwe.map((item: any) => {
+              const pendingToThis = personal.pendingSent?.find((p: any) => p.recipient_member_id === item.creditorId);
+              return (
+                <div
+                  key={item.creditorId}
+                  className="p-3 rounded-2xl bg-slate-50/70 border border-slate-100 flex items-center justify-between"
                 >
-                  <Send className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Báo trả</span>
-                </button>
-              </div>
-            ))}
+                  <div className="flex items-center space-x-3">
+                    <Avatar name={item.creditorName} avatarUrl={item.avatarUrl} size="sm" />
+                    <div>
+                      <div className="font-bold text-slate-800 text-xs">{item.creditorName}</div>
+                      <div className="text-xs font-extrabold text-rose-500">Cần trả: {formatVND(item.amount)}</div>
+                    </div>
+                  </div>
+
+                  {pendingToThis ? (
+                    <span className="text-[11px] font-bold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-xl">
+                      Chờ xác nhận
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => onOpenPaymentModal(item.creditorId, item.amount)}
+                      className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center space-x-1.5 transition active:scale-95 shadow-2xs"
+                    >
+                      <Send className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Báo trả</span>
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           {onNavigateToDebts && (
@@ -319,13 +383,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <Avatar name={item.debtorName} avatarUrl={item.avatarUrl} size="sm" />
                   <div>
                     <div className="font-bold text-slate-800 text-xs">{item.debtorName}</div>
-                    <div className="text-[11px] text-slate-400">cần chuyển lại cho bạn</div>
+                    <div className="text-[11px] text-slate-400">chưa trả bạn</div>
                   </div>
                 </div>
 
-                <div className="text-right">
-                  <div className="text-xs font-extrabold text-emerald-600">+{formatVND(item.amount)}</div>
-                  <span className="text-[10px] text-slate-400">chưa trả</span>
+                <div className="flex items-center gap-2">
+                  <div className="text-xs font-extrabold text-emerald-600 whitespace-nowrap">+{formatVND(item.amount)}</div>
+                  {onOpenRecordReceived &&
+                    !personal.pendingReceived?.some((p: any) => p.payer_member_id === item.debtorId) && (
+                      <button
+                        onClick={() => onOpenRecordReceived(item.debtorId, item.amount)}
+                        className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-[11px] px-2.5 py-1.5 rounded-xl transition active:scale-95 whitespace-nowrap"
+                        title="Ghi nhận đã nhận tiền (trả ngoài app)"
+                      >
+                        Đã nhận
+                      </button>
+                    )}
                 </div>
               </div>
             ))}
@@ -382,6 +455,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           ))}
         </div>
       </div>
+      {onStartTour && (
+        <button
+          type="button"
+          onClick={onStartTour}
+          className="w-full text-center text-[11px] font-semibold text-slate-400 hover:text-slate-700 py-2 transition"
+        >
+          📖 Xem lại hướng dẫn sử dụng
+        </button>
+      )}
     </div>
   );
 };

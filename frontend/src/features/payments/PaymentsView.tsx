@@ -18,73 +18,61 @@ interface PaymentsViewProps {
   currentMemberId?: string | null;
   payments: any[];
   onRefresh: () => void;
+  busyPaymentIds?: string[];
+  runPaymentAction?: (
+    paymentId: string,
+    action: () => Promise<{ success: boolean; error?: string }>,
+    successMsg: string
+  ) => Promise<boolean>;
 }
 
 export const PaymentsView: React.FC<PaymentsViewProps> = ({
   groupCode,
   currentMemberId,
   payments,
-  onRefresh
+  onRefresh,
+  busyPaymentIds = [],
+  runPaymentAction
 }) => {
   const [rejectingPaymentId, setRejectingPaymentId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleConfirm = async (paymentId: string) => {
+  // Dùng chung cơ chế khóa theo từng giao dịch với App (chống bấm đúp gửi 2 request)
+  const run = async (paymentId: string, action: () => Promise<any>, msg: string) => {
+    if (runPaymentAction) return runPaymentAction(paymentId, action, msg);
     setIsSubmitting(true);
-    const res = await api.confirmPayment(groupCode, currentMemberId || 'anonymous', paymentId);
+    const res = await action();
     setIsSubmitting(false);
+    if (res.success) toast.success(msg);
+    else toast.error(res.error || 'Không thể xử lý giao dịch');
+    onRefresh();
+    return res.success;
+  };
 
-    if (res.success) {
-      confetti({
-        particleCount: 80,
-        spread: 60,
-        origin: { y: 0.7 }
-      });
-      toast.success('Đã xác nhận nhận tiền thành công');
-      onRefresh();
-    } else {
-      toast.error(res.error || 'Không thể xác nhận');
-    }
+  const handleConfirm = async (paymentId: string) => {
+    const ok = await run(paymentId, () => api.confirmPayment(groupCode, currentMemberId || 'anonymous', paymentId), 'Đã xác nhận nhận tiền thành công');
+    if (ok) confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
   };
 
   const handleReject = async () => {
-    if (!rejectReason.trim()) {
-      toast.error('Vui lòng nhập lý do từ chối');
+    if (rejectReason.trim().length < 2) {
+      toast.error('Vui lòng nhập lý do từ chối (ít nhất 2 ký tự)');
       return;
     }
     if (!rejectingPaymentId) return;
-
+    const pid = rejectingPaymentId;
     setIsSubmitting(true);
-    const res = await api.rejectPayment(
-      groupCode,
-      currentMemberId || 'anonymous',
-      rejectingPaymentId,
-      rejectReason.trim()
-    );
+    const ok = await run(pid, () => api.rejectPayment(groupCode, currentMemberId || 'anonymous', pid, rejectReason.trim()), 'Đã từ chối giao dịch');
     setIsSubmitting(false);
-
-    if (res.success) {
-      toast.success('Đã từ chối giao dịch');
+    if (ok) {
       setRejectingPaymentId(null);
       setRejectReason('');
-      onRefresh();
-    } else {
-      toast.error(res.error || 'Không thể từ chối');
     }
   };
 
   const handleCancel = async (paymentId: string) => {
-    setIsSubmitting(true);
-    const res = await api.cancelPayment(groupCode, currentMemberId || 'anonymous', paymentId);
-    setIsSubmitting(false);
-
-    if (res.success) {
-      toast.success('Đã hủy yêu cầu thanh toán');
-      onRefresh();
-    } else {
-      toast.error(res.error || 'Không thể hủy yêu cầu');
-    }
+    await run(paymentId, () => api.cancelPayment(groupCode, currentMemberId || 'anonymous', paymentId), 'Đã hủy yêu cầu thanh toán');
   };
 
   return (
@@ -109,9 +97,15 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
             const isRejected = p.status === 'REJECTED';
             const isCancelled = p.status === 'CANCELLED';
 
-            const recipientNames = p.allocations?.map((a: any) => a.recipient_name).join(', ') || 'Thành viên';
+            const recipientNames =
+              p.recipient_name ||
+              [...new Set((p.allocations || []).map((a: any) => a.recipient_name))].join(', ') ||
+              'Thành viên';
+            const isBusy = isSubmitting || busyPaymentIds.includes(p.id);
             const isMePayer = currentMemberId === p.payer_member_id;
-            const isMeRecipient = p.allocations?.some((a: any) => a.recipient_member_id === currentMemberId);
+            const isMeRecipient =
+              p.recipient_member_id === currentMemberId ||
+              p.allocations?.some((a: any) => a.recipient_member_id === currentMemberId);
 
             return (
               <div
@@ -173,15 +167,15 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
                       <>
                         <button
                           onClick={() => handleConfirm(p.id)}
-                          disabled={isSubmitting}
+                          disabled={isBusy}
                           className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl flex items-center space-x-1 shadow-sm transition"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Xác nhận đã nhận</span>
+                          <span>{busyPaymentIds.includes(p.id) ? 'Đang xử lý...' : 'Xác nhận đã nhận'}</span>
                         </button>
                         <button
                           onClick={() => setRejectingPaymentId(p.id)}
-                          disabled={isSubmitting}
+                          disabled={isBusy}
                           className="bg-slate-100 hover:bg-rose-50 text-rose-600 font-semibold text-xs px-3 py-1.5 rounded-xl transition"
                         >
                           Từ chối
@@ -192,7 +186,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({
                     {isMePayer && (
                       <button
                         onClick={() => handleCancel(p.id)}
-                        disabled={isSubmitting}
+                        disabled={isBusy}
                         className="text-slate-500 hover:text-slate-700 text-xs font-semibold px-2 py-1"
                       >
                         Hủy yêu cầu

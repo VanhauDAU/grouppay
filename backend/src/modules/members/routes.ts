@@ -4,7 +4,7 @@ import { CreateMemberSchema, UpdateMemberSchema, BankAccountSchema } from '@tinh
 import type { AppEnv } from '../../middleware/groupAuth.js';
 import { requireGroup } from '../../middleware/groupAuth.js';
 import { getDb } from '../../db/db.js';
-import { broadcastGroupEvent, logAudit, createNotification } from '../../services/realtime.js';
+import { broadcastGroupEvent, logAudit, auditStatement, notificationStatement } from '../../services/realtime.js';
 
 export const membersRouter = new Hono<AppEnv>();
 
@@ -78,9 +78,11 @@ membersRouter.post('/:groupCode/members', requireGroup, async (c) => {
     [memberId, group.id, name, avatarUrl || null, now, now]
   );
 
-  await broadcastGroupEvent(c.env, group.id, 'member.created', memberId, null, { name });
-  await logAudit(c.env, group.id, null, 'MEMBER_ADDED', 'member', memberId, { name });
-  await createNotification(c.env, group.id, null, 'MEMBER_ADDED', 'Thành viên mới', `${name} đã được thêm vào nhóm.`);
+  await db.batch([
+    auditStatement(db, group.id, c.get('currentMember')?.id, 'MEMBER_ADDED', 'member', memberId, { name }),
+    notificationStatement(db, group.id, null, 'MEMBER_ADDED', 'Thành viên mới', `${name} đã được thêm vào nhóm.`)
+  ]);
+  await broadcastGroupEvent(c.env, group.id, 'member.created', memberId, c.get('currentMember')?.id, { name });
 
   return c.json({
     success: true,
@@ -135,11 +137,12 @@ membersRouter.patch('/:groupCode/members/:memberId', requireGroup, async (c) => 
     ]
   );
 
-  await broadcastGroupEvent(c.env, group.id, 'member.updated', memberId, null, { name, status, avatarUrl });
-  await logAudit(c.env, group.id, null, 'MEMBER_UPDATED', 'member', memberId, {
+  // Không gửi avatarUrl (có thể là ảnh base64 ~200KB) qua WebSocket / audit log
+  await logAudit(c.env, group.id, c.get('currentMember')?.id, 'MEMBER_UPDATED', 'member', memberId, {
     old: { name: member.name, status: member.status },
-    new: { name: name || member.name, status: status || member.status, avatarUrl }
+    new: { name: name || member.name, status: status || member.status, avatarChanged: avatarUrl !== undefined }
   });
+  await broadcastGroupEvent(c.env, group.id, 'member.updated', memberId, c.get('currentMember')?.id, { name, status });
 
   return c.json({ success: true, message: 'Cập nhật thành viên thành công' });
 });
@@ -157,6 +160,14 @@ membersRouter.post('/:groupCode/members/:memberId/bank', requireGroup, async (c)
   const db = getDb(c.env);
   const now = new Date().toISOString();
   const { bankBin, bankCode, bankName, accountNumber, accountHolder, isQrEnabled } = parsed.data;
+
+  const member = await db.queryFirst<{ id: string }>(`SELECT id FROM members WHERE id = ? AND group_id = ?`, [
+    memberId,
+    group.id
+  ]);
+  if (!member) {
+    return c.json({ success: false, error: 'Thành viên không tồn tại' }, 404);
+  }
 
   const existing = await db.queryFirst<{ id: string }>(`SELECT id FROM bank_accounts WHERE member_id = ?`, [
     memberId
@@ -176,6 +187,8 @@ membersRouter.post('/:groupCode/members/:memberId/bank', requireGroup, async (c)
       [nanoid(), memberId, bankBin, bankCode, bankName, accountNumber, accountHolder, isQrEnabled ? 1 : 0, now, now]
     );
   }
+
+  await broadcastGroupEvent(c.env, group.id, 'member.updated', memberId, c.get('currentMember')?.id, { bank: true });
 
   return c.json({ success: true, message: 'Cấu hình tài khoản ngân hàng thành công' });
 });

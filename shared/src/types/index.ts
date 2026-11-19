@@ -234,7 +234,8 @@ export type RealtimeEventType =
   | 'payment.confirmed'
   | 'payment.rejected'
   | 'payment.cancelled'
-  | 'notification.created';
+  | 'notification.created'
+  | 'group.deleted';
 
 export interface RealtimeMessage {
   eventId: string;

@@ -1,9 +1,15 @@
 import { nanoid } from 'nanoid';
 import type { RealtimeEventType, RealtimeMessage } from '@tinhtien/shared';
-import { getDb } from '../db/db.js';
+import { getDb, type DatabaseHelper } from '../db/db.js';
 
+/**
+ * Broadcast 1 sự kiện tới room của nhóm.
+ * Tối ưu chi phí: chỉ 1 request tới Durable Object, không truy vấn D1
+ * (WebSocket endpoint luôn map client vào room theo group.id nên không cần room theo public_code nữa).
+ * Mỗi thao tác chỉ nên gọi hàm này 1 lần — client tự đồng bộ lại toàn bộ (gồm cả thông báo) qua /sync.
+ */
 export async function broadcastGroupEvent(
-  env: { GROUP_ROOM: DurableObjectNamespace; DB: any },
+  env: { GROUP_ROOM: DurableObjectNamespace },
   groupId: string,
   eventType: RealtimeEventType,
   entityId: string,
@@ -21,44 +27,68 @@ export async function broadcastGroupEvent(
   };
 
   try {
-    // 1. Luôn broadcast tới room bằng groupId (UUID nội bộ)
-    const doId = env.GROUP_ROOM.idFromName(groupId);
-    const roomStub = env.GROUP_ROOM.get(doId);
-    const p1 = roomStub.fetch('http://internal/broadcast', {
+    const roomStub = env.GROUP_ROOM.get(env.GROUP_ROOM.idFromName(groupId));
+    await roomStub.fetch('http://internal/broadcast', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(event)
     });
-
-    // 2. Broadcast đồng thời tới cả room bằng public_code nếu có DB
-    // Đảm bảo client kết nối bằng public_code hay groupId đều nhận tức thì!
-    let p2: Promise<any> | null = null;
-    if (env.DB) {
-      try {
-        const db = getDb(env);
-        const group = await db.queryFirst<{ id: string; public_code: string }>(
-          'SELECT id, public_code FROM groups WHERE id = ? OR public_code = ? LIMIT 1',
-          [groupId, groupId]
-        );
-        if (group?.public_code && group.public_code !== groupId) {
-          const doIdCode = env.GROUP_ROOM.idFromName(group.public_code);
-          const roomStubCode = env.GROUP_ROOM.get(doIdCode);
-          p2 = roomStubCode.fetch('http://internal/broadcast', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(event)
-          });
-        }
-      } catch {
-        // ignore
-      }
-    }
-
-    await Promise.allSettled([p1, p2].filter(Boolean) as Promise<any>[]);
   } catch (err) {
     // Durable Object broadcast lỗi không chặn luồng chính
     console.error('Failed to broadcast DO event:', err);
   }
+}
+
+/** Câu lệnh ghi audit log để gộp vào db.batch() của thao tác chính (bớt 1 round-trip D1). */
+export function auditStatement(
+  db: DatabaseHelper,
+  groupId: string,
+  actorMemberId: string | null | undefined,
+  action: string,
+  entityType: string,
+  entityId: string,
+  metadata?: any
+) {
+  return db.prepare(
+    `INSERT INTO audit_logs (id, group_id, actor_member_id, action, entity_type, entity_id, metadata, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      nanoid(),
+      groupId,
+      actorMemberId || null,
+      action,
+      entityType,
+      entityId,
+      metadata ? JSON.stringify(metadata) : null,
+      new Date().toISOString()
+    ]
+  );
+}
+
+/** Câu lệnh tạo thông báo để gộp vào db.batch() của thao tác chính. */
+export function notificationStatement(
+  db: DatabaseHelper,
+  groupId: string,
+  targetMemberId: string | null,
+  type: string,
+  title: string,
+  message: string,
+  data?: any
+) {
+  return db.prepare(
+    `INSERT INTO notifications (id, group_id, target_member_id, type, title, message, data, is_read, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+    [
+      nanoid(),
+      groupId,
+      targetMemberId || null,
+      type,
+      title,
+      message,
+      data ? JSON.stringify(data) : null,
+      new Date().toISOString()
+    ]
+  );
 }
 
 export async function logAudit(
@@ -71,23 +101,13 @@ export async function logAudit(
   metadata?: any
 ): Promise<void> {
   const db = getDb(env);
-  const now = new Date().toISOString();
-  await db.execute(
-    `INSERT INTO audit_logs (id, group_id, actor_member_id, action, entity_type, entity_id, metadata, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      nanoid(),
-      groupId,
-      actorMemberId || null,
-      action,
-      entityType,
-      entityId,
-      metadata ? JSON.stringify(metadata) : null,
-      now
-    ]
-  );
+  await auditStatement(db, groupId, actorMemberId, action, entityType, entityId, metadata).run();
 }
 
+/**
+ * Tạo thông báo. Mặc định KHÔNG broadcast riêng (sự kiện chính của thao tác đã kích hoạt client đồng bộ),
+ * tránh nhân đôi request Durable Object + request /sync trên mọi thiết bị.
+ */
 export async function createNotification(
   env: { DB: any; GROUP_ROOM: DurableObjectNamespace },
   groupId: string,
@@ -95,21 +115,13 @@ export async function createNotification(
   type: string,
   title: string,
   message: string,
-  data?: any
+  data?: any,
+  options: { broadcast?: boolean } = {}
 ): Promise<void> {
   const db = getDb(env);
-  const notifId = nanoid();
-  const now = new Date().toISOString();
+  await notificationStatement(db, groupId, targetMemberId, type, title, message, data).run();
 
-  await db.execute(
-    `INSERT INTO notifications (id, group_id, target_member_id, type, title, message, data, is_read, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)`,
-    [notifId, groupId, targetMemberId || null, type, title, message, data ? JSON.stringify(data) : null, now]
-  );
-
-  await broadcastGroupEvent(env, groupId, 'notification.created', notifId, null, {
-    title,
-    message,
-    targetMemberId
-  });
+  if (options.broadcast) {
+    await broadcastGroupEvent(env, groupId, 'notification.created', groupId, null, { title, targetMemberId });
+  }
 }

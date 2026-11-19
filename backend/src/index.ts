@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import type { AppEnv } from './middleware/groupAuth.js';
+import { resolveGroup } from './middleware/groupAuth.js';
 import { groupsRouter } from './modules/groups/routes.js';
 import { membersRouter } from './modules/members/routes.js';
 import { activitiesRouter } from './modules/activities/routes.js';
@@ -22,7 +23,7 @@ app.use(
   cors({
     origin: '*',
     allowMethods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization', 'X-Group-Code', 'X-Member-Id']
+    allowHeaders: ['Content-Type', 'Authorization', 'X-Group-Code', 'X-Member-Id', 'X-Owner-Token']
   })
 );
 
@@ -42,21 +43,17 @@ app.get('/api/groups/:groupCode/ws', async (c) => {
   const groupCode = c.req.param('groupCode');
   const memberId = c.req.query('memberId') || 'anonymous';
 
-  // Lấy GroupRoom Durable Object tương ứng: ưu tiên ID chuẩn từ DB
-  let roomId = groupCode;
-  try {
-    const { getDb } = await import('./db/db.js');
-    const db = getDb(c.env);
-    const group = await db.queryFirst<{ id: string; public_code: string }>(
-      'SELECT id, public_code FROM groups WHERE public_code = ? OR id = ? LIMIT 1',
-      [groupCode, groupCode]
-    );
-    if (group?.id) {
-      roomId = group.id;
-    }
-  } catch {
-    // fallback roomId = groupCode
+  if (c.req.header('Upgrade')?.toLowerCase() !== 'websocket') {
+    return c.json({ success: false, error: 'Expected WebSocket upgrade' }, 426);
   }
+
+  // Room luôn theo group.id (cache isolate -> thường không tốn truy vấn D1).
+  // Nhóm không tồn tại -> từ chối, tránh tạo Durable Object rác (tốn phí) theo mã bất kỳ.
+  const group = await resolveGroup(c.env, groupCode);
+  if (!group) {
+    return c.json({ success: false, error: 'Không tìm thấy nhóm' }, 404);
+  }
+  const roomId = group.id;
 
   const doId = c.env.GROUP_ROOM.idFromName(roomId);
   const roomStub = c.env.GROUP_ROOM.get(doId);

@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Modal } from '../../components/common/Modal.js';
 import { Avatar } from '../../components/common/Avatar.js';
 import { formatVND } from '../../utils/format.js';
 import { api } from '../../services/api.js';
 import { toast } from 'sonner';
-import { Send, CheckCircle2, DollarSign } from 'lucide-react';
+import { playSound } from '../../utils/sound.js';
+import { Send, CheckCircle2, Clock } from 'lucide-react';
 
 interface Member {
   id: string;
@@ -20,8 +21,15 @@ interface PaymentModalProps {
   members: Member[];
   initialRecipientId?: string | null;
   initialAmount?: number;
+  /** Các yêu cầu của chính mình đang chờ xác nhận (để chặn gửi trùng ngay trên giao diện) */
+  pendingPayments?: any[];
+  /** Danh sách người mình đang nợ (nợ ròng) để gợi ý số tiền & giới hạn */
+  peopleIOwe?: { creditorId: string; amount: number }[];
   onPaymentSuccess: () => void;
 }
+
+const newIdempotencyKey = () =>
+  `pay_${Date.now().toString(36)}_${(globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)).replace(/-/g, '').slice(0, 16)}`;
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({
   isOpen,
@@ -31,28 +39,43 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   members,
   initialRecipientId,
   initialAmount,
+  pendingPayments = [],
+  peopleIOwe = [],
   onPaymentSuccess
 }) => {
-  const otherMembers = members.filter((m) => m.id !== currentMemberId);
-  const [recipientId, setRecipientId] = useState<string>(initialRecipientId || otherMembers[0]?.id || '');
-  const [amount, setAmount] = useState<number | ''>(initialAmount || '');
+  // Chỉ hiện những người mình đang thực sự nợ (nếu có dữ liệu), tránh báo trả nhầm người
+  const owedIds = new Set(peopleIOwe.map((p) => p.creditorId));
+  const otherMembers = members.filter(
+    (m) => m.id !== currentMemberId && (owedIds.size === 0 || owedIds.has(m.id) || m.id === initialRecipientId)
+  );
+  const [recipientId, setRecipientId] = useState<string>('');
+  const [amount, setAmount] = useState<number | ''>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+  // 1 mã chống trùng cho MỖI LẦN MỞ form: bấm đúp / mạng gửi lại đều được server nhận diện là 1 giao dịch
+  const idempotencyKeyRef = useRef<string>(newIdempotencyKey());
 
+  // Khởi tạo lại form mỗi khi mở (không bị ghi đè khi dữ liệu nhóm đồng bộ ngầm)
   useEffect(() => {
-    if (initialRecipientId) {
-      setRecipientId(initialRecipientId);
-    } else if (otherMembers.length > 0 && !recipientId) {
-      setRecipientId(otherMembers[0].id);
-    }
-  }, [initialRecipientId, otherMembers]);
-
-  useEffect(() => {
-    if (initialAmount && initialAmount > 0) {
-      setAmount(initialAmount);
-    }
-  }, [initialAmount]);
+    if (!isOpen) return;
+    idempotencyKeyRef.current = newIdempotencyKey();
+    const firstId = initialRecipientId || otherMembers[0]?.id || '';
+    setRecipientId(firstId);
+    const owed = peopleIOwe.find((p) => p.creditorId === firstId)?.amount;
+    setAmount(initialAmount && initialAmount > 0 ? initialAmount : owed || '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, initialRecipientId, initialAmount]);
 
   const recipient = members.find((m) => m.id === recipientId);
+  const maxOwed = peopleIOwe.find((p) => p.creditorId === recipientId)?.amount || 0;
+  const existingPending = pendingPayments.find((p) => p.recipient_member_id === recipientId);
+
+  const handleChangeRecipient = (id: string) => {
+    setRecipientId(id);
+    const owed = peopleIOwe.find((p) => p.creditorId === id)?.amount;
+    if (owed) setAmount(owed);
+    idempotencyKeyRef.current = newIdempotencyKey();
+  };
 
   const handleQuickAdd = (value: number) => {
     const current = typeof amount === 'number' ? amount : 0;
@@ -75,24 +98,44 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       toast.error('Vui lòng chọn người nhận tiền');
       return;
     }
-
+    if (existingPending) {
+      toast.error('Bạn đã có yêu cầu đang chờ người này xác nhận');
+      return;
+    }
+    if (maxOwed > 0 && amt > maxOwed) {
+      toast.error(`Bạn chỉ đang nợ ${recipient?.name || 'người này'} ${formatVND(maxOwed)}`);
+      return;
+    }
+    // Khóa đồng bộ bằng ref: chặn cả trường hợp bấm 2 lần trước khi React kịp render lại
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setIsSubmitting(true);
-    const idempotencyKey = `pay_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-    const res = await api.createPayment(groupCode, currentMemberId, {
-      payerMemberId: currentMemberId,
-      recipientMemberId: recipientId,
-      amount: amt,
-      idempotencyKey
-    });
-    setIsSubmitting(false);
+    try {
+      const res: any = await api.createPayment(groupCode, currentMemberId, {
+        payerMemberId: currentMemberId,
+        recipientMemberId: recipientId,
+        amount: amt,
+        idempotencyKey: idempotencyKeyRef.current
+      });
 
-    if (res.success) {
-      toast.success(`Đã báo trả tiền cho ${recipient?.name || 'người nhận'}! Đang chờ xác nhận.`);
-      onPaymentSuccess();
-      onClose();
-    } else {
-      toast.error(res.error || 'Không thể gửi thông báo trả tiền');
+      if (res.success) {
+        playSound('success');
+        toast.success(
+          res.duplicated
+            ? 'Yêu cầu này đã được gửi trước đó, đang chờ xác nhận.'
+            : `Đã báo trả tiền cho ${recipient?.name || 'người nhận'}! Đang chờ xác nhận.`
+        );
+        idempotencyKeyRef.current = newIdempotencyKey();
+        onPaymentSuccess();
+        onClose();
+      } else {
+        toast.error(res.error || 'Không thể gửi thông báo trả tiền');
+        if (res.code === 'PENDING_EXISTS') onPaymentSuccess();
+      }
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
     }
   };
 
@@ -109,7 +152,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               <div className="relative">
                 <select
                   value={recipientId}
-                  onChange={(e) => setRecipientId(e.target.value)}
+                  onChange={(e) => handleChangeRecipient(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500 transition appearance-none"
                 >
                   {otherMembers.map((m) => (
@@ -158,13 +201,13 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
           {/* Phím tắt chọn nhanh */}
           <div className="flex flex-wrap gap-1.5 mt-2.5">
-            {initialAmount && initialAmount > 0 && initialAmount !== amount && (
+            {maxOwed > 0 && maxOwed !== amount && (
               <button
                 type="button"
-                onClick={() => setAmount(initialAmount)}
+                onClick={() => setAmount(maxOwed)}
                 className="bg-emerald-50 text-emerald-700 border border-emerald-200/80 hover:bg-emerald-100 text-[11px] font-bold px-2.5 py-1.5 rounded-xl transition"
               >
-                Trả hết ({formatVND(initialAmount)})
+                Trả hết ({formatVND(maxOwed)})
               </button>
             )}
             <button
@@ -207,6 +250,16 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           </div>
         </div>
 
+        {existingPending && (
+          <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-2xl flex items-start space-x-2.5">
+            <Clock className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="text-xs text-amber-900 leading-relaxed">
+              Bạn đã báo chuyển <b>{formatVND(existingPending.total_amount)}</b> cho <b>{recipient?.name}</b> và đang chờ xác nhận.
+              Hãy chờ người nhận bấm "Đã nhận" hoặc hủy yêu cầu cũ ở tab Thanh toán trước khi gửi yêu cầu mới.
+            </div>
+          </div>
+        )}
+
         {/* Hướng dẫn cơ chế xác nhận */}
         <div className="bg-emerald-50/70 border border-emerald-200/80 p-3.5 rounded-2xl flex items-start space-x-2.5">
           <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
@@ -219,7 +272,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         <div className="pt-2">
           <button
             type="submit"
-            disabled={isSubmitting || !amount || Number(amount) <= 0}
+            disabled={isSubmitting || !amount || Number(amount) <= 0 || Boolean(existingPending)}
             className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-2xl shadow-lg transition active:scale-[0.98] disabled:opacity-50 flex items-center justify-center space-x-2"
           >
             <Send className="w-4 h-4 text-emerald-400" />

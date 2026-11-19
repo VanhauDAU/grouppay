@@ -180,4 +180,32 @@ CREATE INDEX IF NOT EXISTS idx_payments_group_id ON payments(group_id);
 CREATE INDEX IF NOT EXISTS idx_payments_idempotency ON payments(idempotency_key);
 CREATE INDEX IF NOT EXISTS idx_notifications_group_target ON notifications(group_id, target_member_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_group_id ON audit_logs(group_id);
+
+-- Indexes bổ sung (tối ưu rows read trên D1 & chống trùng thanh toán)
+CREATE INDEX IF NOT EXISTS idx_payment_allocations_payment ON payment_allocations(payment_id);
+CREATE INDEX IF NOT EXISTS idx_payment_allocations_recipient ON payment_allocations(recipient_member_id);
+CREATE INDEX IF NOT EXISTS idx_expense_payers_expense ON expense_payers(expense_id);
+CREATE INDEX IF NOT EXISTS idx_expense_splits_expense ON expense_splits(expense_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_group_id ON expenses(group_id);
+CREATE INDEX IF NOT EXISTS idx_debt_obligations_source ON debt_obligations(source_id);
+CREATE INDEX IF NOT EXISTS idx_debt_obligations_pair ON debt_obligations(group_id, debtor_member_id, creditor_member_id, status);
+CREATE INDEX IF NOT EXISTS idx_payments_group_status ON payments(group_id, status);
+CREATE INDEX IF NOT EXISTS idx_activities_group_occurred ON activities(group_id, occurred_at);
+CREATE INDEX IF NOT EXISTS idx_notifications_group_created ON notifications(group_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_group_created ON audit_logs(group_id, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_group_idem_unique ON payments(group_id, idempotency_key);
+
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id TEXT PRIMARY KEY,
+  group_id TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+  member_id TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  user_agent TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_push_subscriptions_group_endpoint ON push_subscriptions(group_id, endpoint);
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_member ON push_subscriptions(group_id, member_id);
 `;

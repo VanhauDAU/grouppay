@@ -1,0 +1,15 @@
+# Luôn kiểm tra bản mới cho các file "điều khiển" app (app đã cài sẽ nhận bản mới ngay)
+/
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+/sw.js
+  Cache-Control: no-cache
+/version.json
+  Cache-Control: no-store
+/manifest.json
+  Cache-Control: no-cache
+
+# File JS/CSS có hash trong tên -> cache vĩnh viễn, mở app nhanh hơn
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

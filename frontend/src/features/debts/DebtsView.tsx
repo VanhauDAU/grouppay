@@ -8,6 +8,7 @@ import { PairwiseDebtDetailModal } from './PairwiseDebtDetailModal.js';
 import { ExportDebtImageModal } from './ExportDebtImageModal.js';
 import { api } from '../../services/api.js';
 import { toast } from 'sonner';
+import { playSound } from '../../utils/sound.js';
 
 interface Member {
   id: string;
@@ -24,6 +25,7 @@ interface DebtsViewProps {
   debtsData: any;
   dashboardData?: any;
   onRefresh: () => void;
+  onOpenRecordReceived?: (debtorId: string, amount: number) => void;
   onOpenPaymentModal: (recipientId?: string, defaultAmount?: number) => void;
 }
 
@@ -35,7 +37,8 @@ export const DebtsView: React.FC<DebtsViewProps> = ({
   debtsData,
   dashboardData,
   onRefresh,
-  onOpenPaymentModal
+  onOpenPaymentModal,
+  onOpenRecordReceived
 }) => {
   const [activeTab, setActiveTab] = useState<'PAIRWISE' | 'OBLIGATIONS'>('PAIRWISE');
   const [isInitialDebtModalOpen, setIsInitialDebtModalOpen] = useState(false);
@@ -79,6 +82,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({
     setIsSubmitting(false);
 
     if (res.success) {
+      playSound('success');
       toast.success('Đã nhập công nợ ban đầu thành công');
       setIsInitialDebtModalOpen(false);
       setInitialAmount('');
@@ -186,6 +190,19 @@ export const DebtsView: React.FC<DebtsViewProps> = ({
                         </span>
                         <span className="text-[10px] text-slate-400">còn nợ ròng</span>
                       </div>
+
+                      {currentMemberId === item.netCreditorId && onOpenRecordReceived && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenRecordReceived(item.netDebtorId, item.netAmount);
+                          }}
+                          className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-bold text-[11px] px-2.5 py-2 rounded-xl transition"
+                          title="Ghi nhận đã nhận tiền (trả ngoài app)"
+                        >
+                          Đã nhận
+                        </button>
+                      )}
 
                       {isMeDebtor && (
                         <button
@@ -368,6 +385,7 @@ export const DebtsView: React.FC<DebtsViewProps> = ({
         members={members}
         currentMemberId={currentMemberId}
         onOpenPaymentModal={onOpenPaymentModal}
+        onOpenRecordReceived={onOpenRecordReceived}
       />
 
       {/* Modal Xuất ảnh công nợ gửi Messenger */}

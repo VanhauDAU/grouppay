@@ -1,16 +1,6 @@
 import React, { useRef, useState } from 'react';
-import {
-  Download,
-  Copy,
-  Share2,
-  Check,
-  CheckCircle2,
-  Receipt,
-  ArrowRight,
-  Sparkles,
-  Layers,
-  Image as ImageIcon
-} from 'lucide-react';
+import { Download, Copy, Share2, Check, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Avatar } from '../../components/common/Avatar.js';
 import { Modal } from '../../components/common/Modal.js';
 import { formatVND } from '../../utils/format.js';
 import { toPng, toBlob } from 'html-to-image';
@@ -19,6 +9,7 @@ import { toast } from 'sonner';
 interface Member {
   id: string;
   name: string;
+  avatarUrl?: string | null;
 }
 
 interface ExportDebtImageModalProps {
@@ -45,37 +36,37 @@ export const ExportDebtImageModal: React.FC<ExportDebtImageModalProps> = ({
   const [isCopied, setIsCopied] = useState(false);
 
   const { pairwiseDebts = [] } = debtsData || {};
-  const activeDebts = pairwiseDebts.filter((d: any) => d.netAmount > 0);
-  const settlementProposals = dashboardData?.settlementProposals || [];
   const totalExpense = dashboardData?.group?.totalExpense || 0;
+  const memberById = new Map((members as any[]).map((m) => [m.id, m]));
 
-  // Danh sách chuyển tiền ưu tiên dùng thuật toán tối giản nếu có, hoặc danh sách công nợ ròng
-  const transferPlan: { from: string; to: string; amount: number }[] =
-    settlementProposals.length > 0
-      ? settlementProposals.map((p: any) => ({
-          from: p.fromMemberName,
-          to: p.toMemberName,
-          amount: p.amount
-        }))
-      : activeDebts.map((d: any) => ({
-          from: d.netDebtorName,
-          to: d.netCreditorName,
-          amount: d.netAmount
-        }));
+  // Dùng NỢ RÒNG TỪNG CẶP: đúng con số app cho phép "Báo trả" (phương án tối giản có thể bảo
+  // người A chuyển cho người C mà A không trực tiếp nợ -> app sẽ không ghi nhận được).
+  const transferPlan: { fromId: string; toId: string; from: string; to: string; amount: number }[] = pairwiseDebts
+    .filter((d: any) => d.netAmount > 0)
+    .map((d: any) => ({
+      fromId: d.netDebtorId,
+      toId: d.netCreditorId,
+      from: d.netDebtorId === d.memberAId ? d.memberAName : d.memberBName,
+      to: d.netCreditorId === d.memberAId ? d.memberAName : d.memberBName,
+      amount: d.netAmount
+    }))
+    .sort((x: any, y: any) => x.from.localeCompare(y.from, 'vi') || y.amount - x.amount);
+  const totalTransfer = transferPlan.reduce((sum, t) => sum + t.amount, 0);
 
-  // Danh sách ai được nhận lại / ai cần trả
-  const memberBalances: { name: string; net: number }[] =
-    dashboardData?.group?.memberBalances || [];
-  const receivers = memberBalances.filter((m) => m.net > 0);
-  const payers = memberBalances.filter((m) => m.net < 0);
+  // Gom theo người cần trả: đọc 1 khối là biết mình phải chuyển cho ai bao nhiêu
+  const byDebtor: { id: string; name: string; total: number; items: typeof transferPlan }[] = [];
+  for (const t of transferPlan) {
+    let g = byDebtor.find((x) => x.id === t.fromId);
+    if (!g) {
+      g = { id: t.fromId, name: t.from, total: 0, items: [] };
+      byDebtor.push(g);
+    }
+    g.total += t.amount;
+    g.items.push(t);
+  }
+  byDebtor.sort((a, b) => b.total - a.total);
 
-  const currentDateStr = new Date().toLocaleDateString('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  const currentDateStr = new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   // Tải ảnh về máy
   const handleDownload = async () => {
@@ -84,7 +75,7 @@ export const ExportDebtImageModal: React.FC<ExportDebtImageModalProps> = ({
       setIsGenerating(true);
       const dataUrl = await toPng(cardRef.current, {
         quality: 0.95,
-        pixelRatio: 2.5,
+        pixelRatio: 3,
         backgroundColor: '#ffffff'
       });
       const link = document.createElement('a');
@@ -107,7 +98,7 @@ export const ExportDebtImageModal: React.FC<ExportDebtImageModalProps> = ({
       setIsGenerating(true);
       const blob = await toBlob(cardRef.current, {
         quality: 0.95,
-        pixelRatio: 2.5,
+        pixelRatio: 3,
         backgroundColor: '#ffffff'
       });
 
@@ -137,7 +128,7 @@ export const ExportDebtImageModal: React.FC<ExportDebtImageModalProps> = ({
       setIsGenerating(true);
       const blob = await toBlob(cardRef.current, {
         quality: 0.95,
-        pixelRatio: 2.5,
+        pixelRatio: 3,
         backgroundColor: '#ffffff'
       });
 
@@ -162,7 +153,7 @@ export const ExportDebtImageModal: React.FC<ExportDebtImageModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Xuất ảnh công nợ gửi Messenger" maxWidth="md">
+    <Modal isOpen={isOpen} onClose={onClose} title="Ảnh công nợ gửi nhóm" maxWidth="md">
       <div className="space-y-4">
         {/* Nút thao tác nhanh */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -196,105 +187,79 @@ export const ExportDebtImageModal: React.FC<ExportDebtImageModalProps> = ({
           )}
         </div>
 
-        {/* Khung hiển thị trước Thẻ Ảnh (Infographic Card Preview) */}
-        <div className="bg-slate-100/80 p-2 sm:p-3 rounded-2xl flex justify-center overflow-x-auto">
-          {/* PHẦN ĐƯỢC CHỤP ẢNH CHUẨN XÁC */}
+        {/* Xem trước ảnh — thẻ gọn, chỉ giữ thông tin cần để chuyển tiền */}
+        <div className="bg-slate-100/80 p-3 rounded-2xl flex justify-center overflow-x-auto">
           <div
             ref={cardRef}
-            className="w-full max-w-[390px] bg-white rounded-3xl p-5 shadow-md border border-slate-200 text-slate-900 space-y-4"
-            style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}
+            className="w-[340px] bg-white rounded-[22px] overflow-hidden text-slate-900"
+            style={{ fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" }}
           >
-            {/* Header Thẻ: Gradient bắt mắt */}
-            <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-4 rounded-2xl shadow-xs space-y-1">
-              <div className="flex items-center justify-between text-[11px] text-slate-400 uppercase tracking-wider font-bold">
-                <span>Sổ Nợ Nghĩa Tình • Công Nợ</span>
-                <span>{currentDateStr}</span>
-              </div>
-              <h3 className="text-base font-black tracking-tight text-white line-clamp-1">
-                {groupName}
-              </h3>
-              <div className="text-[11px] text-emerald-400 font-semibold">
-                Mã nhóm: {groupCode.toUpperCase()}
+            {/* Đầu thẻ */}
+            <div className="px-4 pt-4 pb-3 bg-gradient-to-br from-slate-900 to-slate-700 text-white">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[10px] font-semibold text-white/60 uppercase tracking-wider">Công nợ nhóm</div>
+                  <div className="text-[17px] font-extrabold leading-tight truncate">{groupName}</div>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <div className="text-[10px] text-white/60">{currentDateStr}</div>
+                  {totalExpense > 0 && (
+                    <div className="text-[11px] font-bold text-white/90">Chi {formatVND(totalExpense)}</div>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Chỉ số chính: Tổng chi tiêu */}
-            {totalExpense > 0 && (
-              <div className="bg-slate-50 border border-slate-100 p-3 rounded-2xl flex items-center justify-between text-xs">
-                <span className="font-bold text-slate-500">Tổng chi tiêu nhóm:</span>
-                <span className="text-sm font-black text-slate-900">{formatVND(totalExpense)}</span>
-              </div>
-            )}
-
-            {/* Mục quan trọng nhất: Kế hoạch chuyển tiền (Ai chuyển cho ai) */}
-            <div className="space-y-2">
-              <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-800 uppercase tracking-wider">
-                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Kế hoạch chuyển tiền ({transferPlan.length})</span>
-              </div>
-
+            {/* Ai chuyển cho ai */}
+            <div className="px-3 py-3">
               {transferPlan.length === 0 ? (
-                <div className="bg-emerald-50 border border-emerald-200/80 p-4 rounded-2xl text-center space-y-1">
-                  <CheckCircle2 className="w-6 h-6 text-emerald-600 mx-auto" />
-                  <div className="text-xs font-bold text-emerald-800">Cả nhóm đã cân bằng!</div>
-                  <div className="text-[11px] text-emerald-600">Không còn ai nợ ai tiền nữa.</div>
+                <div className="py-5 text-center">
+                  <CheckCircle2 className="w-7 h-7 text-emerald-500 mx-auto" />
+                  <div className="text-sm font-extrabold text-emerald-700 mt-1">Không ai nợ ai 🎉</div>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {transferPlan.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="bg-slate-50 p-3 rounded-2xl border border-slate-200/70 flex items-center justify-between"
-                    >
-                      <div className="flex items-center space-x-1.5 text-xs">
-                        <span className="font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-100">
-                          {item.from}
-                        </span>
-                        <ArrowRight className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                        <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100">
-                          {item.to}
-                        </span>
+                  {byDebtor.map((g) => {
+                    const m: any = memberById.get(g.id);
+                    return (
+                      <div key={g.id} className="rounded-2xl border border-slate-100 bg-slate-50/60 px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <Avatar name={g.name} avatarUrl={m?.avatarUrl} size="xs" />
+                          <span className="text-[13px] font-extrabold text-slate-900 truncate">{g.name}</span>
+                          <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">chuyển cho</span>
+                        </div>
+                        <div className="mt-1 pl-8 space-y-0.5">
+                          {g.items.map((t) => (
+                            <div key={t.toId} className="flex items-center gap-1.5 text-[12.5px]">
+                              <ArrowRight className="w-3 h-3 text-slate-300 flex-shrink-0" />
+                              <span className="font-semibold text-slate-700 truncate">{t.to}</span>
+                              <span className="ml-auto font-extrabold text-rose-600 tabular-nums whitespace-nowrap">
+                                {formatVND(t.amount)}
+                              </span>
+                            </div>
+                          ))}
+                          {g.items.length > 1 && (
+                            <div className="flex items-center justify-end gap-1 pt-0.5 text-[10.5px] text-slate-400">
+                              <span>Tổng cộng</span>
+                              <span className="font-bold tabular-nums">{formatVND(g.total)}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <span className="text-sm font-black text-slate-900">
-                        {formatVND(item.amount)}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
 
-            {/* Tóm tắt nhanh: Ai nhận / Ai trả */}
-            {(receivers.length > 0 || payers.length > 0) && (
-              <div className="pt-2 border-t border-slate-100 text-[11px] space-y-1.5">
-                <div className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">
-                  Số dư ròng từng thành viên:
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {receivers.map((r, i) => (
-                    <span
-                      key={i}
-                      className="bg-emerald-50 text-emerald-800 border border-emerald-100 font-bold px-2 py-0.5 rounded-lg"
-                    >
-                      {r.name}: +{formatVND(r.net)}
-                    </span>
-                  ))}
-                  {payers.map((p, i) => (
-                    <span
-                      key={i}
-                      className="bg-rose-50 text-rose-800 border border-rose-100 font-bold px-2 py-0.5 rounded-lg"
-                    >
-                      {p.name}: -{formatVND(Math.abs(p.net))}
-                    </span>
-                  ))}
-                </div>
+            {/* Chân thẻ */}
+            {transferPlan.length > 0 && (
+              <div className="mx-3 mb-3 px-3 py-2 rounded-xl bg-slate-50 flex items-center justify-between text-[11px]">
+                <span className="text-slate-500 font-semibold">{transferPlan.length} lượt chuyển</span>
+                <span className="font-semibold text-slate-500">Tổng {formatVND(totalTransfer)}</span>
               </div>
             )}
-
-            {/* Footer Thẻ */}
-            <div className="pt-2 border-t border-slate-100 text-center text-[10px] text-slate-400 font-semibold">
-              ⚡ Minh bạch • Chính xác • Gửi vào Messenger/Zalo nhóm
-            </div>
+            <div className="pb-2.5 text-center text-[9px] font-semibold text-slate-300">Sổ Nợ Nghĩa Tình</div>
           </div>
         </div>
       </div>

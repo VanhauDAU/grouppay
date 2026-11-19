@@ -5,6 +5,9 @@ compatibility_flags = ["nodejs_compat"]
 
 [vars]
 ENVIRONMENT = "production"
+# Khóa công khai Web Push (VAPID). Khóa bí mật tương ứng: secret VAPID_PRIVATE_KEY (wrangler secret put)
+VAPID_PUBLIC_KEY = "BC8jALLeLCPB4Ml0hAPQy4-Uc08wmMV0B5VJSsVKP1Xy-DVgxLpYrrzPBrjdsMIsgweYsyG9rtZdRGQIFJrJ0X0"
+VAPID_SUBJECT = "https://sononghiatinh.pages.dev"
 
 [[d1_databases]]
 binding = "DB"
@@ -21,4 +24,4 @@ tag = "v1"
 new_sqlite_classes = ["GroupRoomDO"]
 
 [triggers]
-crons = ["0 13 * * SUN"] # 20:00 VN time (UTC+7) = 13:00 UTC on Sunday
+crons = ["0 * * * *"] # Mỗi giờ: gửi nhắc nợ cho nhóm có lịch (thứ + giờ VN) trùng giờ hiện tại
