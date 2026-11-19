@@ -701,7 +701,8 @@ export function App() {
             members={members}
             onRefresh={fetchAllData}
             isOpenAddModal={isAddMemberOpen}
-            onCloseAddModal={() => setIsAddMemberOpen(!isAddMemberOpen)}
+            onOpenAddModal={() => setIsAddMemberOpen(true)}
+            onCloseAddModal={() => setIsAddMemberOpen(false)}
             onOpenBankConfig={(m) => setBankConfigMember(m)}
             onOpenThemePicker={(m) => {
               setProfileTargetMember(m);

@@ -29,6 +29,7 @@ interface MembersViewProps {
   members: Member[];
   onRefresh: () => void;
   isOpenAddModal: boolean;
+  onOpenAddModal: () => void;
   onCloseAddModal: () => void;
   onOpenBankConfig: (member: Member) => void;
   onOpenThemePicker?: (member: Member) => void;
@@ -40,6 +41,7 @@ export const MembersView: React.FC<MembersViewProps> = ({
   members,
   onRefresh,
   isOpenAddModal,
+  onOpenAddModal,
   onCloseAddModal,
   onOpenBankConfig,
   onOpenThemePicker
@@ -114,10 +116,8 @@ export const MembersView: React.FC<MembersViewProps> = ({
         </div>
 
         <button
-          onClick={() => {
-            const addBtn = document.getElementById('btn-add-member');
-            if (addBtn) addBtn.click();
-          }}
+          type="button"
+          onClick={onOpenAddModal}
           className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center space-x-1 transition shadow-xs active:scale-95"
         >
           <UserPlus className="w-3.5 h-3.5" />
